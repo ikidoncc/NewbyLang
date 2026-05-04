@@ -9,5 +9,11 @@ all: $(TARGET)
 $(TARGET): $(OBJ)
 	$(CC) $(OBJ) -o $(TARGET)
 
+run: $(TARGET)
+	./$(TARGET) hello.cj
+	nasm -f elf64 output.asm -o output.o
+	ld output.o -o output
+	./output
+
 clean:
 	rm -f $(OBJ) $(TARGET) output.asm output.o output
