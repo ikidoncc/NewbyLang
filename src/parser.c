@@ -105,6 +105,42 @@ static ASTNode *parse_statement(Parser *p) {
         eat(p, TOKEN_RPAREN);
         eat(p, TOKEN_SEMICOLON);
         return ast_new_print(expr);
+    } else if (p->current_token.type == TOKEN_IF) {
+        eat(p, TOKEN_IF);
+        eat(p, TOKEN_LPAREN);
+        ASTNode *condition = parse_expression(p);
+        eat(p, TOKEN_RPAREN);
+        
+        // Suporte a blocos { } ou statement único
+        ASTNode *then_branch = NULL;
+        if (p->current_token.type == TOKEN_LBRACE) {
+            eat(p, TOKEN_LBRACE);
+            ASTNode *prog = ast_new_program();
+            while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) {
+                ast_program_add(prog, parse_statement(p));
+            }
+            eat(p, TOKEN_RBRACE);
+            then_branch = prog;
+        } else {
+            then_branch = parse_statement(p);
+        }
+
+        ASTNode *else_branch = NULL;
+        if (p->current_token.type == TOKEN_ELSE) {
+            eat(p, TOKEN_ELSE);
+            if (p->current_token.type == TOKEN_LBRACE) {
+                eat(p, TOKEN_LBRACE);
+                ASTNode *prog = ast_new_program();
+                while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) {
+                    ast_program_add(prog, parse_statement(p));
+                }
+                eat(p, TOKEN_RBRACE);
+                else_branch = prog;
+            } else {
+                else_branch = parse_statement(p);
+            }
+        }
+        return ast_new_if(condition, then_branch, else_branch);
     } else if (p->current_token.type == TOKEN_MATCH) {
         eat(p, TOKEN_MATCH);
         eat(p, TOKEN_LPAREN);

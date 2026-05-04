@@ -56,6 +56,8 @@ Token lexer_next_token(Lexer *lexer) {
         else if (strcmp(val, "bool") == 0) t = create_token(TOKEN_BOOL, NULL);
         else if (strcmp(val, "true") == 0) t = create_token(TOKEN_TRUE, NULL);
         else if (strcmp(val, "false") == 0) t = create_token(TOKEN_FALSE, NULL);
+        else if (strcmp(val, "if") == 0) t = create_token(TOKEN_IF, NULL);
+        else if (strcmp(val, "else") == 0) t = create_token(TOKEN_ELSE, NULL);
         else if (strcmp(val, "match") == 0) t = create_token(TOKEN_MATCH, NULL);
         else if (strcmp(val, "case") == 0) t = create_token(TOKEN_CASE, NULL);
         else if (strcmp(val, "default") == 0) t = create_token(TOKEN_DEFAULT, NULL);

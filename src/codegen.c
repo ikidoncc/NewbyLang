@@ -68,50 +68,56 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
 
 void codegen_generate(Codegen *cg, ASTNode *node) {
     if (node->type == AST_PROGRAM) {
-        fprintf(cg->out, "section .text\n");
-        fprintf(cg->out, "global _start\n\n");
-        fprintf(cg->out, "_start:\n");
-        fprintf(cg->out, "    push rbp\n");
-        fprintf(cg->out, "    mov rbp, rsp\n");
-        fprintf(cg->out, "    sub rsp, 128 ; Reserve space for vars\n\n");
+        static int top_level = 1;
+        int is_top = top_level;
+        if (is_top) {
+            top_level = 0;
+            fprintf(cg->out, "section .text\n");
+            fprintf(cg->out, "global _start\n\n");
+            fprintf(cg->out, "_start:\n");
+            fprintf(cg->out, "    push rbp\n");
+            fprintf(cg->out, "    mov rbp, rsp\n");
+            fprintf(cg->out, "    sub rsp, 128 ; Reserve space for vars\n\n");
+        }
 
         for (int i = 0; i < node->data.program.count; i++) {
             codegen_generate(cg, node->data.program.nodes[i]);
         }
 
-        fprintf(cg->out, "\n    mov rsp, rbp\n");
-        fprintf(cg->out, "    pop rbp\n");
-        fprintf(cg->out, "    mov rax, 60 ; syscall exit\n");
-        fprintf(cg->out, "    xor rdi, rdi\n");
-        fprintf(cg->out, "    syscall\n\n");
+        if (is_top) {
+            fprintf(cg->out, "\n    mov rsp, rbp\n");
+            fprintf(cg->out, "    pop rbp\n");
+            fprintf(cg->out, "    mov rax, 60 ; syscall exit\n");
+            fprintf(cg->out, "    xor rdi, rdi\n");
+            fprintf(cg->out, "    syscall\n\n");
 
-        // Simple print helper
-        fprintf(cg->out, "print_num:\n");
-        fprintf(cg->out, "    push rbp\n");
-        fprintf(cg->out, "    mov rbp, rsp\n");
-        fprintf(cg->out, "    sub rsp, 32\n");
-        fprintf(cg->out, "    mov rax, rdi\n");
-        fprintf(cg->out, "    mov rcx, 10\n");
-        fprintf(cg->out, "    mov rsi, rbp\n");
-        fprintf(cg->out, "    dec rsi\n");
-        fprintf(cg->out, "    mov byte [rsi], 10 ; newline\n");
-        fprintf(cg->out, ".loop:\n");
-        fprintf(cg->out, "    xor rdx, rdx\n");
-        fprintf(cg->out, "    div rcx\n");
-        fprintf(cg->out, "    add dl, '0'\n");
-        fprintf(cg->out, "    dec rsi\n");
-        fprintf(cg->out, "    mov [rsi], dl\n");
-        fprintf(cg->out, "    test rax, rax\n");
-        fprintf(cg->out, "    jnz .loop\n");
-        fprintf(cg->out, "    mov rax, 1 ; syscall write\n");
-        fprintf(cg->out, "    mov rdi, 1 ; stdout\n");
-        fprintf(cg->out, "    mov rdx, rbp\n");
-        fprintf(cg->out, "    sub rdx, rsi\n");
-        fprintf(cg->out, "    syscall\n");
-        fprintf(cg->out, "    leave\n");
-        fprintf(cg->out, "    ret\n");
-
-    } else if (node->type == AST_VAR_DECL) {
+            // Simple print helper
+            fprintf(cg->out, "print_num:\n");
+            fprintf(cg->out, "    push rbp\n");
+            fprintf(cg->out, "    mov rbp, rsp\n");
+            fprintf(cg->out, "    sub rsp, 32\n");
+            fprintf(cg->out, "    mov rax, rdi\n");
+            fprintf(cg->out, "    mov rcx, 10\n");
+            fprintf(cg->out, "    mov rsi, rbp\n");
+            fprintf(cg->out, "    dec rsi\n");
+            fprintf(cg->out, "    mov byte [rsi], 10 ; newline\n");
+            fprintf(cg->out, ".loop:\n");
+            fprintf(cg->out, "    xor rdx, rdx\n");
+            fprintf(cg->out, "    div rcx\n");
+            fprintf(cg->out, "    add dl, '0'\n");
+            fprintf(cg->out, "    dec rsi\n");
+            fprintf(cg->out, "    mov [rsi], dl\n");
+            fprintf(cg->out, "    test rax, rax\n");
+            fprintf(cg->out, "    jnz .loop\n");
+            fprintf(cg->out, "    mov rax, 1 ; syscall write\n");
+            fprintf(cg->out, "    mov rdi, 1 ; stdout\n");
+            fprintf(cg->out, "    mov rdx, rbp\n");
+            fprintf(cg->out, "    sub rdx, rsi\n");
+            fprintf(cg->out, "    syscall\n");
+            fprintf(cg->out, "    leave\n");
+            fprintf(cg->out, "    ret\n");
+            top_level = 1; // Reset for next run if needed
+        }
         gen_expression(cg, node->data.var_decl.value);
         cg->stack_pos += 8;
         symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos, node->data.var_decl.type);
@@ -121,6 +127,25 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         gen_expression(cg, node->data.print_expr);
         fprintf(cg->out, "    pop rdi\n");
         fprintf(cg->out, "    call print_num\n");
+    } else if (node->type == AST_IF) {
+        gen_expression(cg, node->data.if_stmt.condition);
+        fprintf(cg->out, "    pop rax\n");
+        fprintf(cg->out, "    test rax, rax\n");
+        
+        int else_label = new_label();
+        int end_label = new_label();
+        
+        fprintf(cg->out, "    jz .L%d\n", node->data.if_stmt.else_branch ? else_label : end_label);
+        
+        codegen_generate(cg, node->data.if_stmt.then_branch);
+        fprintf(cg->out, "    jmp .L%d\n", end_label);
+        
+        if (node->data.if_stmt.else_branch) {
+            fprintf(cg->out, ".L%d:\n", else_label);
+            codegen_generate(cg, node->data.if_stmt.else_branch);
+        }
+        
+        fprintf(cg->out, ".L%d: ; end if\n", end_label);
     } else if (node->type == AST_MATCH) {
         gen_expression(cg, node->data.match.expr);
         fprintf(cg->out, "    pop rax ; match expression\n");

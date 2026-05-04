@@ -6,6 +6,8 @@ typedef enum {
     TOKEN_BOOL,
     TOKEN_TRUE,
     TOKEN_FALSE,
+    TOKEN_IF,
+    TOKEN_ELSE,
     TOKEN_MATCH,
     TOKEN_CASE,
     TOKEN_DEFAULT,

@@ -72,6 +72,19 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             semantic_analyze(node->data.print_expr, tab);
             break;
 
+        case AST_IF:
+            semantic_analyze(node->data.if_stmt.condition, tab);
+            if (node->data.if_stmt.condition->eval_type != TYPE_BOOL) {
+                fprintf(stderr, "Semantic Error: 'if' condition must be of type bool, got %s\n",
+                        type_to_string(node->data.if_stmt.condition->eval_type));
+                exit(1);
+            }
+            semantic_analyze(node->data.if_stmt.then_branch, tab);
+            if (node->data.if_stmt.else_branch) {
+                semantic_analyze(node->data.if_stmt.else_branch, tab);
+            }
+            break;
+
         case AST_MATCH:
             semantic_analyze(node->data.match.expr, tab);
             if (node->data.match.expr->eval_type != TYPE_INT) {

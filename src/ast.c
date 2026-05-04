@@ -63,6 +63,16 @@ ASTNode *ast_new_program() {
     return node;
 }
 
+ASTNode *ast_new_if(ASTNode *condition, ASTNode *then_branch, ASTNode *else_branch) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_IF;
+    node->data.if_stmt.condition = condition;
+    node->data.if_stmt.then_branch = then_branch;
+    node->data.if_stmt.else_branch = else_branch;
+    node->eval_type = TYPE_UNKNOWN;
+    return node;
+}
+
 ASTNode *ast_new_match(ASTNode *expr) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_MATCH;
