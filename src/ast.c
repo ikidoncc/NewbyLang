@@ -6,6 +6,15 @@ ASTNode *ast_new_number(int val) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_NUMBER;
     node->data.number = val;
+    node->eval_type = TYPE_INT;
+    return node;
+}
+
+ASTNode *ast_new_bool(int val) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_BOOL;
+    node->data.bool_val = val;
+    node->eval_type = TYPE_BOOL;
     return node;
 }
 
@@ -13,6 +22,7 @@ ASTNode *ast_new_variable(char *name) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_VARIABLE;
     node->data.var_name = strdup(name);
+    node->eval_type = TYPE_UNKNOWN; // To be determined by semantic analysis
     return node;
 }
 
@@ -22,14 +32,17 @@ ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {
     node->data.bin_op.op = strdup(op);
     node->data.bin_op.left = left;
     node->data.bin_op.right = right;
+    node->eval_type = TYPE_UNKNOWN;
     return node;
 }
 
-ASTNode *ast_new_var_decl(char *name, ASTNode *value) {
+ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_VAR_DECL;
+    node->data.var_decl.type = type;
     node->data.var_decl.name = strdup(name);
     node->data.var_decl.value = value;
+    node->eval_type = TYPE_UNKNOWN;
     return node;
 }
 
@@ -37,6 +50,7 @@ ASTNode *ast_new_print(ASTNode *expr) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_PRINT;
     node->data.print_expr = expr;
+    node->eval_type = TYPE_UNKNOWN;
     return node;
 }
 
@@ -45,7 +59,35 @@ ASTNode *ast_new_program() {
     node->type = AST_PROGRAM;
     node->data.program.nodes = NULL;
     node->data.program.count = 0;
+    node->eval_type = TYPE_UNKNOWN;
     return node;
+}
+
+ASTNode *ast_new_match(ASTNode *expr) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_MATCH;
+    node->data.match.expr = expr;
+    node->data.match.cases = NULL;
+    node->data.match.case_count = 0;
+    node->data.match.default_case = NULL;
+    node->eval_type = TYPE_UNKNOWN;
+    return node;
+}
+
+void ast_match_add_case(ASTNode *match, int val, ASTNode *stmt) {
+    match->data.match.case_count++;
+    match->data.match.cases = realloc(match->data.match.cases, sizeof(ASTNode*) * match->data.match.case_count);
+    
+    ASTNode *c = malloc(sizeof(ASTNode));
+    c->type = AST_CASE;
+    c->data.match_case.val = val;
+    c->data.match_case.stmt = stmt;
+    
+    match->data.match.cases[match->data.match.case_count - 1] = c;
+}
+
+void ast_match_set_default(ASTNode *match, ASTNode *stmt) {
+    match->data.match.default_case = stmt;
 }
 
 void ast_program_add(ASTNode *program, ASTNode *node) {

@@ -53,6 +53,12 @@ Token lexer_next_token(Lexer *lexer) {
 
         Token t;
         if (strcmp(val, "int") == 0) t = create_token(TOKEN_INT, NULL);
+        else if (strcmp(val, "bool") == 0) t = create_token(TOKEN_BOOL, NULL);
+        else if (strcmp(val, "true") == 0) t = create_token(TOKEN_TRUE, NULL);
+        else if (strcmp(val, "false") == 0) t = create_token(TOKEN_FALSE, NULL);
+        else if (strcmp(val, "match") == 0) t = create_token(TOKEN_MATCH, NULL);
+        else if (strcmp(val, "case") == 0) t = create_token(TOKEN_CASE, NULL);
+        else if (strcmp(val, "default") == 0) t = create_token(TOKEN_DEFAULT, NULL);
         else if (strcmp(val, "print") == 0) t = create_token(TOKEN_PRINT, NULL);
         else t = create_token(TOKEN_ID, val);
 
@@ -60,13 +66,30 @@ Token lexer_next_token(Lexer *lexer) {
         return t;
     }
 
+    char next = lexer->src[lexer->pos + 1];
     lexer->pos++;
     switch (c) {
-        case '=': return create_token(TOKEN_ASSIGN, NULL);
+        case '=': 
+            if (next == '=') { lexer->pos++; return create_token(TOKEN_EQ, NULL); }
+            return create_token(TOKEN_ASSIGN, NULL);
+        case '!':
+            if (next == '=') { lexer->pos++; return create_token(TOKEN_NEQ, NULL); }
+            return create_token(TOKEN_UNKNOWN, NULL);
+        case '&':
+            if (next == '&') { lexer->pos++; return create_token(TOKEN_AND, NULL); }
+            return create_token(TOKEN_UNKNOWN, NULL);
+        case '|':
+            if (next == '|') { lexer->pos++; return create_token(TOKEN_OR, NULL); }
+            return create_token(TOKEN_UNKNOWN, NULL);
+        case '<': return create_token(TOKEN_LT, NULL);
+        case '>': return create_token(TOKEN_GT, NULL);
         case '+': return create_token(TOKEN_PLUS, NULL);
         case ';': return create_token(TOKEN_SEMICOLON, NULL);
+        case ':': return create_token(TOKEN_COLON, NULL);
         case '(': return create_token(TOKEN_LPAREN, NULL);
         case ')': return create_token(TOKEN_RPAREN, NULL);
+        case '{': return create_token(TOKEN_LBRACE, NULL);
+        case '}': return create_token(TOKEN_RBRACE, NULL);
         default: return create_token(TOKEN_UNKNOWN, NULL);
     }
 }

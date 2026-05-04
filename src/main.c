@@ -3,6 +3,7 @@
 #include <string.h>
 #include "lexer.h"
 #include "parser.h"
+#include "semantic.h"
 #include "codegen.h"
 
 char *read_file_content(const char *filename) {
@@ -55,6 +56,10 @@ int main(int argc, char **argv) {
     Lexer *lexer = lexer_new(src);
     Parser *parser = parser_new(lexer);
     ASTNode *root = parser_parse(parser);
+
+    // Análise Semântica
+    SymbolTable *sem_tab = symtab_new();
+    semantic_analyze(root, sem_tab);
 
     FILE *out = fopen(asm_filename, "w");
     if (!out) {

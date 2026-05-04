@@ -9,18 +9,19 @@ SymbolTable *symtab_new() {
     return tab;
 }
 
-void symtab_add(SymbolTable *tab, char *name, int offset) {
+void symtab_add(SymbolTable *tab, char *name, int offset, Type type) {
     tab->count++;
     tab->symbols = realloc(tab->symbols, sizeof(Symbol) * tab->count);
     tab->symbols[tab->count - 1].name = strdup(name);
     tab->symbols[tab->count - 1].stack_offset = offset;
+    tab->symbols[tab->count - 1].type = type;
 }
 
-int symtab_lookup(SymbolTable *tab, char *name) {
+Symbol *symtab_lookup(SymbolTable *tab, char *name) {
     for (int i = 0; i < tab->count; i++) {
         if (strcmp(tab->symbols[i].name, name) == 0) {
-            return tab->symbols[i].stack_offset;
+            return &tab->symbols[i];
         }
     }
-    return -1;
+    return NULL;
 }

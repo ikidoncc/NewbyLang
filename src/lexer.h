@@ -3,13 +3,28 @@
 
 typedef enum {
     TOKEN_INT,
+    TOKEN_BOOL,
+    TOKEN_TRUE,
+    TOKEN_FALSE,
+    TOKEN_MATCH,
+    TOKEN_CASE,
+    TOKEN_DEFAULT,
     TOKEN_ID,
     TOKEN_NUMBER,
     TOKEN_ASSIGN,   // =
     TOKEN_PLUS,     // +
+    TOKEN_EQ,       // ==
+    TOKEN_NEQ,      // !=
+    TOKEN_LT,       // <
+    TOKEN_GT,       // >
+    TOKEN_AND,      // &&
+    TOKEN_OR,       // ||
     TOKEN_SEMICOLON, // ;
+    TOKEN_COLON,     // :
     TOKEN_LPAREN,   // (
     TOKEN_RPAREN,   // )
+    TOKEN_LBRACE,   // {
+    TOKEN_RBRACE,   // }
     TOKEN_PRINT,
     TOKEN_EOF,
     TOKEN_UNKNOWN

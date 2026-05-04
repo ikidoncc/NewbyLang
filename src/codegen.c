@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "codegen.h"
 
 Codegen *codegen_new(FILE *out) {
@@ -10,25 +11,56 @@ Codegen *codegen_new(FILE *out) {
     return cg;
 }
 
+static int label_count = 0;
+
+static int new_label() {
+    return ++label_count;
+}
+
 static void gen_expression(Codegen *cg, ASTNode *node) {
     if (node->type == AST_NUMBER) {
         fprintf(cg->out, "    mov rax, %d\n", node->data.number);
         fprintf(cg->out, "    push rax\n");
+    } else if (node->type == AST_BOOL) {
+        fprintf(cg->out, "    mov rax, %d\n", node->data.bool_val);
+        fprintf(cg->out, "    push rax\n");
     } else if (node->type == AST_VARIABLE) {
-        int offset = symtab_lookup(cg->tab, node->data.var_name);
-        if (offset == -1) {
+        Symbol *s = symtab_lookup(cg->tab, node->data.var_name);
+        if (!s) {
             fprintf(stderr, "Undefined variable: %s\n", node->data.var_name);
             exit(1);
         }
-        fprintf(cg->out, "    mov rax, [rbp - %d]\n", offset);
+        fprintf(cg->out, "    mov rax, [rbp - %d]\n", s->stack_offset);
         fprintf(cg->out, "    push rax\n");
     } else if (node->type == AST_BIN_OP) {
         gen_expression(cg, node->data.bin_op.left);
         gen_expression(cg, node->data.bin_op.right);
         fprintf(cg->out, "    pop rbx\n");
         fprintf(cg->out, "    pop rax\n");
-        if (node->data.bin_op.op[0] == '+') {
+        
+        char *op = node->data.bin_op.op;
+        if (strcmp(op, "+") == 0) {
             fprintf(cg->out, "    add rax, rbx\n");
+        } else if (strcmp(op, "==") == 0) {
+            fprintf(cg->out, "    cmp rax, rbx\n");
+            fprintf(cg->out, "    sete al\n");
+            fprintf(cg->out, "    movzx rax, al\n");
+        } else if (strcmp(op, "!=") == 0) {
+            fprintf(cg->out, "    cmp rax, rbx\n");
+            fprintf(cg->out, "    setne al\n");
+            fprintf(cg->out, "    movzx rax, al\n");
+        } else if (strcmp(op, "<") == 0) {
+            fprintf(cg->out, "    cmp rax, rbx\n");
+            fprintf(cg->out, "    setl al\n");
+            fprintf(cg->out, "    movzx rax, al\n");
+        } else if (strcmp(op, ">") == 0) {
+            fprintf(cg->out, "    cmp rax, rbx\n");
+            fprintf(cg->out, "    setg al\n");
+            fprintf(cg->out, "    movzx rax, al\n");
+        } else if (strcmp(op, "&&") == 0) {
+            fprintf(cg->out, "    and rax, rbx\n");
+        } else if (strcmp(op, "||") == 0) {
+            fprintf(cg->out, "    or rax, rbx\n");
         }
         fprintf(cg->out, "    push rax\n");
     }
@@ -82,12 +114,47 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
     } else if (node->type == AST_VAR_DECL) {
         gen_expression(cg, node->data.var_decl.value);
         cg->stack_pos += 8;
-        symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos);
+        symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos, node->data.var_decl.type);
         fprintf(cg->out, "    pop rax\n");
         fprintf(cg->out, "    mov [rbp - %d], rax\n", cg->stack_pos);
     } else if (node->type == AST_PRINT) {
         gen_expression(cg, node->data.print_expr);
         fprintf(cg->out, "    pop rdi\n");
         fprintf(cg->out, "    call print_num\n");
+    } else if (node->type == AST_MATCH) {
+        gen_expression(cg, node->data.match.expr);
+        fprintf(cg->out, "    pop rax ; match expression\n");
+        
+        int end_label = new_label();
+        int *case_labels = malloc(sizeof(int) * node->data.match.case_count);
+        
+        for (int i = 0; i < node->data.match.case_count; i++) {
+            case_labels[i] = new_label();
+            fprintf(cg->out, "    cmp rax, %d\n", node->data.match.cases[i]->data.match_case.val);
+            fprintf(cg->out, "    je .L%d\n", case_labels[i]);
+        }
+        
+        int default_label = -1;
+        if (node->data.match.default_case) {
+            default_label = new_label();
+            fprintf(cg->out, "    jmp .L%d\n", default_label);
+        } else {
+            fprintf(cg->out, "    jmp .L%d\n", end_label);
+        }
+        
+        for (int i = 0; i < node->data.match.case_count; i++) {
+            fprintf(cg->out, ".L%d:\n", case_labels[i]);
+            codegen_generate(cg, node->data.match.cases[i]->data.match_case.stmt);
+            fprintf(cg->out, "    jmp .L%d\n", end_label);
+        }
+        
+        if (node->data.match.default_case) {
+            fprintf(cg->out, ".L%d:\n", default_label);
+            codegen_generate(cg, node->data.match.default_case);
+            fprintf(cg->out, "    jmp .L%d\n", end_label);
+        }
+        
+        fprintf(cg->out, ".L%d: ; end match\n", end_label);
+        free(case_labels);
     }
 }
