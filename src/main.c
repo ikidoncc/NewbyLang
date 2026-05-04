@@ -32,22 +32,33 @@ char *read_file_content(const char *filename) {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        printf("Usage: %s <filename.cj>\n", argv[0]);
+        printf("Usage: %s <filename.nb>\n", argv[0]);
         return 1;
     }
 
-    char *src = read_file_content(argv[1]);
+    const char *filename = argv[1];
+    char *src = read_file_content(filename);
     if (!src) {
         return 1;
     }
+
+    // Determinar o nome base (ex: hello.nb -> hello)
+    char base_name[256];
+    strncpy(base_name, filename, sizeof(base_name) - 1);
+    char *dot = strrchr(base_name, '.');
+    if (dot) *dot = '\0';
+
+    char asm_filename[260], obj_filename[260];
+    sprintf(asm_filename, "%s.asm", base_name);
+    sprintf(obj_filename, "%s.o", base_name);
 
     Lexer *lexer = lexer_new(src);
     Parser *parser = parser_new(lexer);
     ASTNode *root = parser_parse(parser);
 
-    FILE *out = fopen("output.asm", "w");
+    FILE *out = fopen(asm_filename, "w");
     if (!out) {
-        perror("Error opening output.asm");
+        perror("Error opening assembly file");
         free(src);
         return 1;
     }
@@ -57,7 +68,29 @@ int main(int argc, char **argv) {
 
     fclose(out);
     free(src);
-    printf("Transpilation successful! Assembly generated in output.asm\n");
+    
+    // Automatizar a geração do executável
+    printf("Compiling Newby source: %s\n", filename);
+    printf("Assembling and linking...\n");
+
+    char cmd[512];
+    sprintf(cmd, "nasm -f elf64 %s -o %s", asm_filename, obj_filename);
+    if (system(cmd) != 0) {
+        fprintf(stderr, "Error during assembly (nasm)\n");
+        return 1;
+    }
+
+    sprintf(cmd, "ld %s -o %s", obj_filename, base_name);
+    if (system(cmd) != 0) {
+        fprintf(stderr, "Error during linking (ld)\n");
+        return 1;
+    }
+
+    // Remover arquivos intermediários
+    remove(asm_filename);
+    remove(obj_filename);
+
+    printf("Compilation successful! Executable generated: ./%s\n", base_name);
 
     return 0;
 }

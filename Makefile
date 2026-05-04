@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -g -Isrc
 SRC = src/lexer.c src/ast.c src/parser.c src/symtab.c src/codegen.c src/main.c
 OBJ = $(SRC:.c=.o)
-TARGET = transpiler
+TARGET = nbc
 
 all: $(TARGET)
 
@@ -10,10 +10,9 @@ $(TARGET): $(OBJ)
 	$(CC) $(OBJ) -o $(TARGET)
 
 run: $(TARGET)
-	./$(TARGET) hello.cj
-	nasm -f elf64 output.asm -o output.o
-	ld output.o -o output
-	./output
+	./$(TARGET) hello.nb
+	./hello
 
 clean:
-	rm -f $(OBJ) $(TARGET) output.asm output.o output
+	rm -f $(OBJ) $(TARGET) hello output.asm output.o output
+

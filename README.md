@@ -1,8 +1,8 @@
-# Mini-C Transpiler (x86-64 NASM)
+# Newby Compiler (nbc)
 
-Este é um projeto educacional de um transpiler minimalista escrito em **C puro**, que converte uma linguagem simplificada (inspirada em C) para **Assembly x86-64 (Sintaxe NASM)** para Linux.
+Este é um projeto educacional do **Newby**, um compilador minimalista escrito em **C puro**, que converte código-fonte `.nb` para executáveis binários nativos x86-64 Linux.
 
-O foco deste projeto é didático, demonstrando as etapas fundamentais da construção de um compilador sem a complexidade de otimizações ou bibliotecas externas.
+O foco deste projeto é didático, demonstrando as etapas fundamentais da construção de um compilador real, desde a análise léxica até a geração de código binário.
 
 ## 🚀 Funcionalidades Suportadas
 
@@ -10,74 +10,56 @@ O foco deste projeto é didático, demonstrando as etapas fundamentais da constr
 - Expressões matemáticas básicas (Adição `+`).
 - Comando `print()` para exibir valores inteiros no console.
 - Gerenciamento de variáveis na **Stack** (pilha).
-- Saída em Assembly compatível com **NASM** e chamadas de sistema (**syscalls**) do Linux.
+- Geração de executáveis Linux ELF64 de passo único.
 
 ## 🏗️ Arquitetura do Sistema
 
-O transpiler está dividido em módulos claros, seguindo o pipeline clássico de compilação:
+O compilador `nbc` segue o pipeline clássico:
 
-1.  **Lexer (`src/lexer.c`)**: Transforma o código fonte em uma sequência de tokens significativos.
-2.  **Parser (`src/parser.c`)**: Utiliza a técnica de **Descida Recursiva** para validar a sintaxe e construir a árvore.
-3.  **AST (`src/ast.c`)**: Representa o programa de forma estruturada em uma **Abstract Syntax Tree**.
-4.  **Symbol Table (`src/symtab.c`)**: Mapeia os nomes das variáveis para seus respectivos offsets na pilha (`rbp - offset`).
-5.  **Codegen (`src/codegen.c`)**: Percorre a AST e emite instruções Assembly x86-64. Inclui um helper em Assembly para converter números em strings (print).
+1.  **Lexer (`src/lexer.c`)**: Transforma o código fonte em tokens.
+2.  **Parser (`src/parser.c`)**: Valida a sintaxe e constrói a árvore sintática (AST).
+3.  **Codegen (`src/codegen.c`)**: Gera instruções Assembly x86-64 temporárias e invoca o assembler/linker para criar o executável final.
 
 ## 🛠️ Requisitos
 
-- **GCC** (Compilador C)
-- **NASM** (Assembler)
-- **LD** (Linker do Linux)
+- **GCC** (Para compilar o `nbc`)
+- **NASM** (Assembler usado internamente pelo `nbc`)
+- **LD** (Linker usado internamente pelo `nbc`)
 - **Make**
 
 ## 💻 Como Compilar e Usar
 
-### 1. Compilar o Transpiler
-No diretório raiz do projeto, execute:
+### 1. Compilar o Newby Compiler (`nbc`)
+Execute:
 ```bash
 make
 ```
 
-### 2. Transpilar um Código
-O transpiler aceita o código fonte como uma string no argumento:
+### 2. Compilar um Código Newby
+O compilador gera automaticamente um executável com o mesmo nome do arquivo de entrada (sem a extensão `.nb`):
 ```bash
-./transpiler "int x = 10; int y = x + 5; print(y);"
-```
-Isso gerará um arquivo chamado `output.asm`.
-
-### 3. Gerar o Executável Final
-Use o NASM para montar e o LD para linkar:
-```bash
-nasm -f elf64 output.asm -o output.o
-ld output.o -o output
+./nbc hello.nb
 ```
 
-### 4. Executar
+### 3. Executar o Binário Gerado
 ```bash
-./output
-# Resultado esperado: 15
+./hello
 ```
 
-## 📝 Exemplo de Código Suportado
+### 4. Atalho de Desenvolvimento
+Para compilar o `nbc`, compilar `hello.nb` e executar o resultado em um único passo:
+```bash
+make run
+```
+
+## 📝 Exemplo de Código Newby (`hello.nb`)
 
 ```c
-int a = 100;
-int b = 200;
-int c = a + b;
-print(c);
+int x = 3;
+int y = x + 5;
+print(y);
+print(x);
 ```
 
-## 🧠 Explicação Técnica: Por que Stack?
-
-Diferente de variáveis globais que ficam na seção `.data` ou `.bss`, este transpiler armazena variáveis locais na **Pilha (Stack)**.
-- Usamos o registrador `RBP` como base da moldura de pilha (*stack frame*).
-- Cada nova variável `int` reserva 8 bytes.
-- Isso é fundamental para que, no futuro, você possa adicionar **funções e recursão**, onde cada chamada de função precisa de seu próprio espaço isolado na memória.
-
-## 🔍 Como Evoluir Este Projeto?
-
-- **Operadores:** Adicione `-`, `*` e `/` no Lexer e no `gen_expression` no Codegen.
-- **Controle de Fluxo:** Implemente `if` e `while` gerando labels e instruções de salto (`jmp`, `je`, `jne`).
-- **Input:** Implemente um comando `read()` usando a syscall `read` (ID 0).
-
 ---
-Criado para fins educacionais. Sinta-se à vontade para explorar e modificar o código!
+Criado para fins educacionais. Sinta-se à vontade para explorar e modificar o Newby!
