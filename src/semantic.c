@@ -21,12 +21,12 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
         case AST_VAR_DECL:
             semantic_analyze(node->data.var_decl.value, tab);
             if (node->data.var_decl.value->eval_type != node->data.var_decl.type) {
-                fprintf(stderr, "Semantic Error: Type mismatch in declaration of '%s'. Expected %s, got %s\n",
-                        node->data.var_decl.name, type_to_string(node->data.var_decl.type),
+                fprintf(stderr, "Semantic Error [%d:%d]: Type mismatch in declaration of '%s'. Expected %s, got %s\n",
+                        node->line, node->col, node->data.var_decl.name, 
+                        type_to_string(node->data.var_decl.type),
                         type_to_string(node->data.var_decl.value->eval_type));
                 exit(1);
             }
-            // Add to symtab (mocking stack offset for now, codegen will handle actual offset)
             symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type);
             break;
 
@@ -40,12 +40,12 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
             if (strcmp(op, "+") == 0) {
                 if (is_integer_type(left_t) && is_integer_type(right_t)) {
-                    node->eval_type = left_t; // Simplified
+                    node->eval_type = left_t;
                 } else if (left_t == TYPE_FLOAT && right_t == TYPE_FLOAT) {
                     node->eval_type = TYPE_FLOAT;
                 } else {
-                    fprintf(stderr, "Semantic Error: '+' operator incompatible types: %s and %s\n",
-                            type_to_string(left_t), type_to_string(right_t));
+                    fprintf(stderr, "Semantic Error [%d:%d]: '+' operator incompatible types: %s and %s\n",
+                            node->line, node->col, type_to_string(left_t), type_to_string(right_t));
                     exit(1);
                 }
             } else if (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0 ||
@@ -54,14 +54,14 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
                     (left_t == TYPE_FLOAT && right_t == TYPE_FLOAT)) {
                     node->eval_type = TYPE_BOOL;
                 } else {
-                    fprintf(stderr, "Semantic Error: '%s' operator incompatible types: %s and %s\n",
-                            op, type_to_string(left_t), type_to_string(right_t));
+                    fprintf(stderr, "Semantic Error [%d:%d]: '%s' operator incompatible types: %s and %s\n",
+                            node->line, node->col, op, type_to_string(left_t), type_to_string(right_t));
                     exit(1);
                 }
             } else if (strcmp(op, "&&") == 0 || strcmp(op, "||") == 0) {
                 if (left_t != TYPE_BOOL || right_t != TYPE_BOOL) {
-                    fprintf(stderr, "Semantic Error: '%s' operator only supports bool, got %s and %s\n",
-                            op, type_to_string(left_t), type_to_string(right_t));
+                    fprintf(stderr, "Semantic Error [%d:%d]: '%s' operator only supports bool, got %s and %s\n",
+                            node->line, node->col, op, type_to_string(left_t), type_to_string(right_t));
                     exit(1);
                 }
                 node->eval_type = TYPE_BOOL;
@@ -71,7 +71,8 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
         case AST_VARIABLE: {
             Symbol *s = symtab_lookup(tab, node->data.var_name);
             if (!s) {
-                fprintf(stderr, "Semantic Error: Undefined variable '%s'\n", node->data.var_name);
+                fprintf(stderr, "Semantic Error [%d:%d]: Undefined variable '%s'\n", 
+                        node->line, node->col, node->data.var_name);
                 exit(1);
             }
             node->eval_type = s->type;
@@ -85,8 +86,8 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
         case AST_IF:
             semantic_analyze(node->data.if_stmt.condition, tab);
             if (node->data.if_stmt.condition->eval_type != TYPE_BOOL) {
-                fprintf(stderr, "Semantic Error: 'if' condition must be of type bool, got %s\n",
-                        type_to_string(node->data.if_stmt.condition->eval_type));
+                fprintf(stderr, "Semantic Error [%d:%d]: 'if' condition must be of type bool, got %s\n",
+                        node->line, node->col, type_to_string(node->data.if_stmt.condition->eval_type));
                 exit(1);
             }
             semantic_analyze(node->data.if_stmt.then_branch, tab);
@@ -98,7 +99,8 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
         case AST_MATCH:
             semantic_analyze(node->data.match.expr, tab);
             if (node->data.match.expr->eval_type != TYPE_INT) {
-                fprintf(stderr, "Semantic Error: 'match' expression must be of type int\n");
+                fprintf(stderr, "Semantic Error [%d:%d]: 'match' expression must be of type int\n",
+                        node->line, node->col);
                 exit(1);
             }
             for (int i = 0; i < node->data.match.case_count; i++) {

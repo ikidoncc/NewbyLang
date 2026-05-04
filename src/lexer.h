@@ -44,11 +44,15 @@ typedef enum {
 typedef struct {
     TokenType type;
     char *value;
+    int line;
+    int col;
 } Token;
 
 typedef struct {
     const char *src;
     int pos;
+    int line;
+    int col;
 } Lexer;
 
 Lexer *lexer_new(const char *src);

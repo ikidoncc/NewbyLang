@@ -2,11 +2,17 @@
 #include <string.h>
 #include "ast.h"
 
+void ast_set_loc(ASTNode *node, int line, int col) {
+    node->line = line;
+    node->col = col;
+}
+
 ASTNode *ast_new_number(int val) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_NUMBER;
     node->data.number = val;
     node->eval_type = TYPE_INT;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -15,6 +21,7 @@ ASTNode *ast_new_bool(int val) {
     node->type = AST_BOOL;
     node->data.bool_val = val;
     node->eval_type = TYPE_BOOL;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -23,6 +30,7 @@ ASTNode *ast_new_float(double val) {
     node->type = AST_FLOAT;
     node->data.float_val = val;
     node->eval_type = TYPE_FLOAT;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -31,6 +39,7 @@ ASTNode *ast_new_string(char *val) {
     node->type = AST_STRING;
     node->data.string_val = strdup(val);
     node->eval_type = TYPE_STRING;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -38,7 +47,8 @@ ASTNode *ast_new_variable(char *name) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_VARIABLE;
     node->data.var_name = strdup(name);
-    node->eval_type = TYPE_UNKNOWN; // To be determined by semantic analysis
+    node->eval_type = TYPE_UNKNOWN; 
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -49,6 +59,7 @@ ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {
     node->data.bin_op.left = left;
     node->data.bin_op.right = right;
     node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -59,6 +70,7 @@ ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value) {
     node->data.var_decl.name = strdup(name);
     node->data.var_decl.value = value;
     node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -67,6 +79,7 @@ ASTNode *ast_new_print(ASTNode *expr) {
     node->type = AST_PRINT;
     node->data.print_expr = expr;
     node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -76,6 +89,7 @@ ASTNode *ast_new_program() {
     node->data.program.nodes = NULL;
     node->data.program.count = 0;
     node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -86,6 +100,7 @@ ASTNode *ast_new_if(ASTNode *condition, ASTNode *then_branch, ASTNode *else_bran
     node->data.if_stmt.then_branch = then_branch;
     node->data.if_stmt.else_branch = else_branch;
     node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 
@@ -97,6 +112,7 @@ ASTNode *ast_new_match(ASTNode *expr) {
     node->data.match.case_count = 0;
     node->data.match.default_case = NULL;
     node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
     return node;
 }
 

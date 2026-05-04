@@ -53,5 +53,6 @@ ASTNode *ast_new_match(ASTNode *expr);
 void ast_match_add_case(ASTNode *match, int val, ASTNode *stmt);
 void ast_match_set_default(ASTNode *match, ASTNode *stmt);
 void ast_program_add(ASTNode *program, ASTNode *node);
+void ast_set_loc(ASTNode *node, int line, int col);
 
 #endif
