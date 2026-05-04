@@ -1,0 +1,8 @@
+int8 small = 10;
+int32 medium = 1000;
+int large = 1000000;
+float f = 10.5;
+string s = "Newby";
+
+print(small + medium);
+print(large);

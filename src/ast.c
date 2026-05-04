@@ -18,6 +18,22 @@ ASTNode *ast_new_bool(int val) {
     return node;
 }
 
+ASTNode *ast_new_float(double val) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_FLOAT;
+    node->data.float_val = val;
+    node->eval_type = TYPE_FLOAT;
+    return node;
+}
+
+ASTNode *ast_new_string(char *val) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_STRING;
+    node->data.string_val = strdup(val);
+    node->eval_type = TYPE_STRING;
+    return node;
+}
+
 ASTNode *ast_new_variable(char *name) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_VARIABLE;

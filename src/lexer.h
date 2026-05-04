@@ -4,6 +4,13 @@
 typedef enum {
     TOKEN_INT,
     TOKEN_BOOL,
+    TOKEN_FLOAT,
+    TOKEN_STRING,
+    TOKEN_INT8,
+    TOKEN_INT32,
+    TOKEN_UINT,
+    TOKEN_UINT8,
+    TOKEN_UINT32,
     TOKEN_TRUE,
     TOKEN_FALSE,
     TOKEN_IF,
@@ -13,6 +20,8 @@ typedef enum {
     TOKEN_DEFAULT,
     TOKEN_ID,
     TOKEN_NUMBER,
+    TOKEN_FLOAT_LIT,
+    TOKEN_STRING_LIT,
     TOKEN_ASSIGN,   // =
     TOKEN_PLUS,     // +
     TOKEN_EQ,       // ==

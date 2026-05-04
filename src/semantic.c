@@ -3,6 +3,11 @@
 #include <string.h>
 #include "semantic.h"
 
+static int is_integer_type(Type t) {
+    return t == TYPE_INT || t == TYPE_INT8 || t == TYPE_INT32 || 
+           t == TYPE_UINT || t == TYPE_UINT8 || t == TYPE_UINT32;
+}
+
 void semantic_analyze(ASTNode *node, SymbolTable *tab) {
     if (!node) return;
 
@@ -34,20 +39,25 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             char *op = node->data.bin_op.op;
 
             if (strcmp(op, "+") == 0) {
-                if (left_t != TYPE_INT || right_t != TYPE_INT) {
-                    fprintf(stderr, "Semantic Error: '+' operator only supports int, got %s and %s\n",
+                if (is_integer_type(left_t) && is_integer_type(right_t)) {
+                    node->eval_type = left_t; // Simplified
+                } else if (left_t == TYPE_FLOAT && right_t == TYPE_FLOAT) {
+                    node->eval_type = TYPE_FLOAT;
+                } else {
+                    fprintf(stderr, "Semantic Error: '+' operator incompatible types: %s and %s\n",
                             type_to_string(left_t), type_to_string(right_t));
                     exit(1);
                 }
-                node->eval_type = TYPE_INT;
             } else if (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0 ||
                        strcmp(op, "<") == 0 || strcmp(op, ">") == 0) {
-                if (left_t != TYPE_INT || right_t != TYPE_INT) {
-                    fprintf(stderr, "Semantic Error: '%s' operator only supports int, got %s and %s\n",
+                if ((is_integer_type(left_t) && is_integer_type(right_t)) ||
+                    (left_t == TYPE_FLOAT && right_t == TYPE_FLOAT)) {
+                    node->eval_type = TYPE_BOOL;
+                } else {
+                    fprintf(stderr, "Semantic Error: '%s' operator incompatible types: %s and %s\n",
                             op, type_to_string(left_t), type_to_string(right_t));
                     exit(1);
                 }
-                node->eval_type = TYPE_BOOL;
             } else if (strcmp(op, "&&") == 0 || strcmp(op, "||") == 0) {
                 if (left_t != TYPE_BOOL || right_t != TYPE_BOOL) {
                     fprintf(stderr, "Semantic Error: '%s' operator only supports bool, got %s and %s\n",
@@ -105,6 +115,14 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_BOOL:
             node->eval_type = TYPE_BOOL;
+            break;
+
+        case AST_FLOAT:
+            node->eval_type = TYPE_FLOAT;
+            break;
+
+        case AST_STRING:
+            node->eval_type = TYPE_STRING;
             break;
 
         default:

@@ -9,6 +9,8 @@ typedef enum {
     AST_BIN_OP,
     AST_NUMBER,
     AST_BOOL,
+    AST_FLOAT,
+    AST_STRING,
     AST_VARIABLE,
     AST_PRINT,
     AST_PROGRAM,
@@ -26,6 +28,8 @@ typedef struct ASTNode {
         struct { char *op; struct ASTNode *left; struct ASTNode *right; } bin_op;
         int number;
         int bool_val; // 0 or 1
+        double float_val;
+        char *string_val;
         char *var_name;
         struct ASTNode *print_expr;
         struct { struct ASTNode **nodes; int count; } program;
@@ -37,6 +41,8 @@ typedef struct ASTNode {
 
 ASTNode *ast_new_number(int val);
 ASTNode *ast_new_bool(int val);
+ASTNode *ast_new_float(double val);
+ASTNode *ast_new_string(char *val);
 ASTNode *ast_new_variable(char *name);
 ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right);
 ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value);

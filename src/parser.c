@@ -89,8 +89,25 @@ static ASTNode *parse_expression(Parser *p) {
 }
 
 static ASTNode *parse_statement(Parser *p) {
-    if (p->current_token.type == TOKEN_INT || p->current_token.type == TOKEN_BOOL) {
-        Type type = (p->current_token.type == TOKEN_INT) ? TYPE_INT : TYPE_BOOL;
+    if (p->current_token.type == TOKEN_INT || p->current_token.type == TOKEN_BOOL ||
+        p->current_token.type == TOKEN_FLOAT || p->current_token.type == TOKEN_STRING ||
+        p->current_token.type == TOKEN_INT8 || p->current_token.type == TOKEN_INT32 ||
+        p->current_token.type == TOKEN_UINT || p->current_token.type == TOKEN_UINT8 ||
+        p->current_token.type == TOKEN_UINT32) {
+        
+        Type type;
+        switch (p->current_token.type) {
+            case TOKEN_INT: type = TYPE_INT; break;
+            case TOKEN_BOOL: type = TYPE_BOOL; break;
+            case TOKEN_FLOAT: type = TYPE_FLOAT; break;
+            case TOKEN_STRING: type = TYPE_STRING; break;
+            case TOKEN_INT8: type = TYPE_INT8; break;
+            case TOKEN_INT32: type = TYPE_INT32; break;
+            case TOKEN_UINT: type = TYPE_UINT; break;
+            case TOKEN_UINT8: type = TYPE_UINT8; break;
+            case TOKEN_UINT32: type = TYPE_UINT32; break;
+            default: type = TYPE_UNKNOWN; break;
+        }
         eat(p, p->current_token.type);
         char *name = strdup(p->current_token.value);
         eat(p, TOKEN_ID);

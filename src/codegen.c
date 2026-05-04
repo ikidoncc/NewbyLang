@@ -118,11 +118,18 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
             fprintf(cg->out, "    ret\n");
             top_level = 1; // Reset for next run if needed
         }
+    } else if (node->type == AST_VAR_DECL) {
         gen_expression(cg, node->data.var_decl.value);
+        int size = 8;
+        if (node->data.var_decl.type == TYPE_INT8 || node->data.var_decl.type == TYPE_UINT8) size = 1;
+        else if (node->data.var_decl.type == TYPE_INT32 || node->data.var_decl.type == TYPE_UINT32) size = 4;
+
         cg->stack_pos += 8;
         symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos, node->data.var_decl.type);
         fprintf(cg->out, "    pop rax\n");
-        fprintf(cg->out, "    mov [rbp - %d], rax\n", cg->stack_pos);
+        if (size == 1) fprintf(cg->out, "    mov [rbp - %d], al\n", cg->stack_pos);
+        else if (size == 4) fprintf(cg->out, "    mov [rbp - %d], eax\n", cg->stack_pos);
+        else fprintf(cg->out, "    mov [rbp - %d], rax\n", cg->stack_pos);
     } else if (node->type == AST_PRINT) {
         gen_expression(cg, node->data.print_expr);
         fprintf(cg->out, "    pop rdi\n");
@@ -170,6 +177,20 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         for (int i = 0; i < node->data.match.case_count; i++) {
             fprintf(cg->out, ".L%d:\n", case_labels[i]);
             codegen_generate(cg, node->data.match.cases[i]->data.match_case.stmt);
+            fprintf(cg->out, "    jmp .L%d\n", end_label);
+        }
+        
+        if (node->data.match.default_case) {
+            fprintf(cg->out, ".L%d:\n", default_label);
+            codegen_generate(cg, node->data.match.default_case);
+            fprintf(cg->out, "    jmp .L%d\n", end_label);
+        }
+        
+        fprintf(cg->out, ".L%d: ; end match\n", end_label);
+        free(case_labels);
+    }
+}
+gen_generate(cg, node->data.match.cases[i]->data.match_case.stmt);
             fprintf(cg->out, "    jmp .L%d\n", end_label);
         }
         
