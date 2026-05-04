@@ -22,6 +22,8 @@ typedef enum {
 typedef struct ASTNode {
     ASTNodeType type;
     Type eval_type; // Type determined after semantic analysis
+    int line;
+    int col;
     union {
         struct { Type type; char *name; struct ASTNode *value; } var_decl;
         struct { char *name; struct ASTNode *value; } assign;
