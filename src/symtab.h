@@ -9,12 +9,13 @@ typedef struct {
     Type type;
 } Symbol;
 
-typedef struct {
+typedef struct SymbolTable {
     Symbol *symbols;
     int count;
+    struct SymbolTable *parent;
 } SymbolTable;
 
-SymbolTable *symtab_new();
+SymbolTable *symtab_new(SymbolTable *parent);
 void symtab_add(SymbolTable *tab, char *name, int offset, Type type);
 Symbol *symtab_lookup(SymbolTable *tab, char *name);
 

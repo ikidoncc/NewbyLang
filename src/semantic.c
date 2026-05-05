@@ -12,11 +12,14 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
     if (!node) return;
 
     switch (node->type) {
-        case AST_PROGRAM:
+        case AST_PROGRAM: {
+            SymbolTable *new_tab = symtab_new(tab);
             for (int i = 0; i < node->data.program.count; i++) {
-                semantic_analyze(node->data.program.nodes[i], tab);
+                semantic_analyze(node->data.program.nodes[i], new_tab);
             }
+            // Free new_tab here if we had a free function, but for now we'll leave it
             break;
+        }
 
         case AST_VAR_DECL:
             semantic_analyze(node->data.var_decl.value, tab);

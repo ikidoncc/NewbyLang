@@ -2,10 +2,11 @@
 #include <string.h>
 #include "symtab.h"
 
-SymbolTable *symtab_new() {
+SymbolTable *symtab_new(SymbolTable *parent) {
     SymbolTable *tab = malloc(sizeof(SymbolTable));
     tab->symbols = NULL;
     tab->count = 0;
+    tab->parent = parent;
     return tab;
 }
 
@@ -23,5 +24,6 @@ Symbol *symtab_lookup(SymbolTable *tab, char *name) {
             return &tab->symbols[i];
         }
     }
+    if (tab->parent) return symtab_lookup(tab->parent, name);
     return NULL;
 }

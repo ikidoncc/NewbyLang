@@ -6,7 +6,7 @@
 Codegen *codegen_new(FILE *out) {
     Codegen *cg = malloc(sizeof(Codegen));
     cg->out = out;
-    cg->tab = symtab_new();
+    cg->tab = symtab_new(NULL);
     cg->stack_pos = 0;
     return cg;
 }
@@ -92,6 +92,9 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
 
 void codegen_generate(Codegen *cg, ASTNode *node) {
     if (node->type == AST_PROGRAM) {
+        SymbolTable *old_tab = cg->tab;
+        cg->tab = symtab_new(old_tab);
+
         static int top_level = 1;
         int is_top = top_level;
         if (is_top) {
@@ -101,7 +104,7 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
             fprintf(cg->out, "_start:\n");
             fprintf(cg->out, "    push rbp\n");
             fprintf(cg->out, "    mov rbp, rsp\n");
-            fprintf(cg->out, "    sub rsp, 128 ; Reserve space for vars\n\n");
+            fprintf(cg->out, "    sub rsp, 1024 ; Reserve more space for vars\n\n");
         }
 
         for (int i = 0; i < node->data.program.count; i++) {
@@ -142,6 +145,7 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
             fprintf(cg->out, "    ret\n");
             top_level = 1; // Reset for next run if needed
         }
+        cg->tab = old_tab;
     } else if (node->type == AST_VAR_DECL) {
         gen_expression(cg, node->data.var_decl.value);
         int size = 8;

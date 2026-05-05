@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
     ASTNode *root = parser_parse(parser);
 
     // Análise Semântica
-    SymbolTable *sem_tab = symtab_new();
+    SymbolTable *sem_tab = symtab_new(NULL);
     semantic_analyze(root, sem_tab);
 
     FILE *out = fopen(asm_filename, "w");
