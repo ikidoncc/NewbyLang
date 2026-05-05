@@ -58,6 +58,13 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
         char *op = node->data.bin_op.op;
         if (strcmp(op, "+") == 0) {
             fprintf(cg->out, "    add rax, rbx\n");
+        } else if (strcmp(op, "-") == 0) {
+            fprintf(cg->out, "    sub rax, rbx\n");
+        } else if (strcmp(op, "*") == 0) {
+            fprintf(cg->out, "    imul rax, rbx\n");
+        } else if (strcmp(op, "/") == 0) {
+            fprintf(cg->out, "    xor rdx, rdx\n");
+            fprintf(cg->out, "    idiv rbx\n");
         } else if (strcmp(op, "==") == 0) {
             fprintf(cg->out, "    cmp rax, rbx\n");
             fprintf(cg->out, "    sete al\n");
@@ -147,6 +154,21 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         if (size == 1) fprintf(cg->out, "    mov [rbp - %d], al\n", cg->stack_pos);
         else if (size == 4) fprintf(cg->out, "    mov [rbp - %d], eax\n", cg->stack_pos);
         else fprintf(cg->out, "    mov [rbp - %d], rax\n", cg->stack_pos);
+    } else if (node->type == AST_ASSIGN) {
+        gen_expression(cg, node->data.assign.value);
+        Symbol *s = symtab_lookup(cg->tab, node->data.assign.name);
+        if (!s) {
+            fprintf(stderr, "Undefined variable: %s\n", node->data.assign.name);
+            exit(1);
+        }
+        int size = 8;
+        if (s->type == TYPE_INT8 || s->type == TYPE_UINT8) size = 1;
+        else if (s->type == TYPE_INT32 || s->type == TYPE_UINT32) size = 4;
+
+        fprintf(cg->out, "    pop rax\n");
+        if (size == 1) fprintf(cg->out, "    mov [rbp - %d], al\n", s->stack_offset);
+        else if (size == 4) fprintf(cg->out, "    mov [rbp - %d], eax\n", s->stack_offset);
+        else fprintf(cg->out, "    mov [rbp - %d], rax\n", s->stack_offset);
     } else if (node->type == AST_PRINT) {
         gen_expression(cg, node->data.print_expr);
         fprintf(cg->out, "    pop rdi\n");
@@ -170,6 +192,20 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         }
         
         fprintf(cg->out, ".L%d: ; end if\n", end_label);
+    } else if (node->type == AST_WHILE) {
+        int start_label = new_label();
+        int end_label = new_label();
+        
+        fprintf(cg->out, ".L%d:\n", start_label);
+        gen_expression(cg, node->data.while_stmt.condition);
+        fprintf(cg->out, "    pop rax\n");
+        fprintf(cg->out, "    test rax, rax\n");
+        fprintf(cg->out, "    jz .L%d\n", end_label);
+        
+        codegen_generate(cg, node->data.while_stmt.body);
+        fprintf(cg->out, "    jmp .L%d\n", start_label);
+        
+        fprintf(cg->out, ".L%d: ; end while\n", end_label);
     } else if (node->type == AST_MATCH) {
         gen_expression(cg, node->data.match.expr);
         fprintf(cg->out, "    pop rax ; match expression\n");

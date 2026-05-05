@@ -15,6 +15,7 @@ typedef enum {
     TOKEN_FALSE,
     TOKEN_IF,
     TOKEN_ELSE,
+    TOKEN_WHILE,
     TOKEN_MATCH,
     TOKEN_CASE,
     TOKEN_DEFAULT,
@@ -24,6 +25,9 @@ typedef enum {
     TOKEN_STRING_LIT,
     TOKEN_ASSIGN,   // =
     TOKEN_PLUS,     // +
+    TOKEN_MINUS,    // -
+    TOKEN_STAR,     // *
+    TOKEN_SLASH,    // /
     TOKEN_EQ,       // ==
     TOKEN_NEQ,      // !=
     TOKEN_LT,       // <

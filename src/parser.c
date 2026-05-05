@@ -53,14 +53,27 @@ static ASTNode *parse_primary(Parser *p) {
     return n;
 }
 
-static ASTNode *parse_arithmetic(Parser *p) {
-    Token t = p->current_token;
+static ASTNode *parse_term(Parser *p) {
     ASTNode *left = parse_primary(p);
-    while (p->current_token.type == TOKEN_PLUS) {
+    while (p->current_token.type == TOKEN_STAR || p->current_token.type == TOKEN_SLASH) {
         Token op_t = p->current_token;
-        eat(p, TOKEN_PLUS);
+        char *op = (op_t.type == TOKEN_STAR) ? "*" : "/";
+        eat(p, op_t.type);
         ASTNode *right = parse_primary(p);
-        left = ast_new_bin_op("+", left, right);
+        left = ast_new_bin_op(op, left, right);
+        ast_set_loc(left, op_t.line, op_t.col);
+    }
+    return left;
+}
+
+static ASTNode *parse_arithmetic(Parser *p) {
+    ASTNode *left = parse_term(p);
+    while (p->current_token.type == TOKEN_PLUS || p->current_token.type == TOKEN_MINUS) {
+        Token op_t = p->current_token;
+        char *op = (op_t.type == TOKEN_PLUS) ? "+" : "-";
+        eat(p, op_t.type);
+        ASTNode *right = parse_term(p);
+        left = ast_new_bin_op(op, left, right);
         ast_set_loc(left, op_t.line, op_t.col);
     }
     return left;
@@ -175,6 +188,27 @@ static ASTNode *parse_statement(Parser *p) {
         ASTNode *node = ast_new_if(condition, then_branch, else_branch);
         ast_set_loc(node, t.line, t.col);
         return node;
+    } else if (t.type == TOKEN_WHILE) {
+        eat(p, TOKEN_WHILE);
+        eat(p, TOKEN_LPAREN);
+        ASTNode *condition = parse_expression(p);
+        eat(p, TOKEN_RPAREN);
+
+        ASTNode *body = NULL;
+        if (p->current_token.type == TOKEN_LBRACE) {
+            eat(p, TOKEN_LBRACE);
+            ASTNode *prog = ast_new_program();
+            while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) {
+                ast_program_add(prog, parse_statement(p));
+            }
+            eat(p, TOKEN_RBRACE);
+            body = prog;
+        } else {
+            body = parse_statement(p);
+        }
+        ASTNode *node = ast_new_while(condition, body);
+        ast_set_loc(node, t.line, t.col);
+        return node;
     } else if (t.type == TOKEN_MATCH) {
         eat(p, TOKEN_MATCH);
         eat(p, TOKEN_LPAREN);
@@ -203,6 +237,21 @@ static ASTNode *parse_statement(Parser *p) {
         
         eat(p, TOKEN_RBRACE);
         return match_node;
+    } else if (t.type == TOKEN_ID) {
+        char *name = strdup(t.value);
+        eat(p, TOKEN_ID);
+        if (p->current_token.type == TOKEN_ASSIGN) {
+            eat(p, TOKEN_ASSIGN);
+            ASTNode *val = parse_expression(p);
+            eat(p, TOKEN_SEMICOLON);
+            ASTNode *node = ast_new_assign(name, val);
+            ast_set_loc(node, t.line, t.col);
+            return node;
+        } else {
+            fprintf(stderr, "Syntax Error [%d:%d]: Expected '=' after variable name\n", 
+                    p->current_token.line, p->current_token.col);
+            exit(1);
+        }
     }
     return NULL;
 }

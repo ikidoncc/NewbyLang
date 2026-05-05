@@ -85,6 +85,7 @@ Token lexer_next_token(Lexer *lexer) {
         else if (strcmp(val, "false") == 0) t = create_token(TOKEN_FALSE, NULL, start_line, start_col);
         else if (strcmp(val, "if") == 0) t = create_token(TOKEN_IF, NULL, start_line, start_col);
         else if (strcmp(val, "else") == 0) t = create_token(TOKEN_ELSE, NULL, start_line, start_col);
+        else if (strcmp(val, "while") == 0) t = create_token(TOKEN_WHILE, NULL, start_line, start_col);
         else if (strcmp(val, "match") == 0) t = create_token(TOKEN_MATCH, NULL, start_line, start_col);
         else if (strcmp(val, "case") == 0) t = create_token(TOKEN_CASE, NULL, start_line, start_col);
         else if (strcmp(val, "default") == 0) t = create_token(TOKEN_DEFAULT, NULL, start_line, start_col);
@@ -135,6 +136,9 @@ Token lexer_next_token(Lexer *lexer) {
         case '<': return create_token(TOKEN_LT, NULL, start_line, start_col);
         case '>': return create_token(TOKEN_GT, NULL, start_line, start_col);
         case '+': return create_token(TOKEN_PLUS, NULL, start_line, start_col);
+        case '-': return create_token(TOKEN_MINUS, NULL, start_line, start_col);
+        case '*': return create_token(TOKEN_STAR, NULL, start_line, start_col);
+        case '/': return create_token(TOKEN_SLASH, NULL, start_line, start_col);
         case ';': return create_token(TOKEN_SEMICOLON, NULL, start_line, start_col);
         case ':': return create_token(TOKEN_COLON, NULL, start_line, start_col);
         case '(': return create_token(TOKEN_LPAREN, NULL, start_line, start_col);

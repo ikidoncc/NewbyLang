@@ -47,13 +47,22 @@ ASTNode *ast_new_variable(char *name) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_VARIABLE;
     node->data.var_name = strdup(name);
-    node->eval_type = TYPE_UNKNOWN; 
+    node->eval_type = TYPE_UNKNOWN;
     ast_set_loc(node, 0, 0);
     return node;
 }
 
-ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {
+ASTNode *ast_new_assign(char *name, ASTNode *value) {
     ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_ASSIGN;
+    node->data.assign.name = strdup(name);
+    node->data.assign.value = value;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {    ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_BIN_OP;
     node->data.bin_op.op = strdup(op);
     node->data.bin_op.left = left;
@@ -99,6 +108,16 @@ ASTNode *ast_new_if(ASTNode *condition, ASTNode *then_branch, ASTNode *else_bran
     node->data.if_stmt.condition = condition;
     node->data.if_stmt.then_branch = then_branch;
     node->data.if_stmt.else_branch = else_branch;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_while(ASTNode *condition, ASTNode *body) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_WHILE;
+    node->data.while_stmt.condition = condition;
+    node->data.while_stmt.body = body;
     node->eval_type = TYPE_UNKNOWN;
     ast_set_loc(node, 0, 0);
     return node;

@@ -30,6 +30,24 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type);
             break;
 
+        case AST_ASSIGN: {
+            Symbol *s = symtab_lookup(tab, node->data.assign.name);
+            if (!s) {
+                fprintf(stderr, "Semantic Error [%d:%d]: Assignment to undefined variable '%s'\n",
+                        node->line, node->col, node->data.assign.name);
+                exit(1);
+            }
+            semantic_analyze(node->data.assign.value, tab);
+            if (node->data.assign.value->eval_type != s->type) {
+                fprintf(stderr, "Semantic Error [%d:%d]: Type mismatch in assignment to '%s'. Expected %s, got %s\n",
+                        node->line, node->col, node->data.assign.name,
+                        type_to_string(s->type),
+                        type_to_string(node->data.assign.value->eval_type));
+                exit(1);
+            }
+            break;
+        }
+
         case AST_BIN_OP:
             semantic_analyze(node->data.bin_op.left, tab);
             semantic_analyze(node->data.bin_op.right, tab);
@@ -94,6 +112,16 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             if (node->data.if_stmt.else_branch) {
                 semantic_analyze(node->data.if_stmt.else_branch, tab);
             }
+            break;
+
+        case AST_WHILE:
+            semantic_analyze(node->data.while_stmt.condition, tab);
+            if (node->data.while_stmt.condition->eval_type != TYPE_BOOL) {
+                fprintf(stderr, "Semantic Error [%d:%d]: 'while' condition must be of type bool, got %s\n",
+                        node->line, node->col, type_to_string(node->data.while_stmt.condition->eval_type));
+                exit(1);
+            }
+            semantic_analyze(node->data.while_stmt.body, tab);
             break;
 
         case AST_MATCH:
