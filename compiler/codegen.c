@@ -50,6 +50,19 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
         for (int i = 0; i < node->data.func_call.arg_count; i++) gen_expression(cg, node->data.func_call.args[i]);
         for (int i = node->data.func_call.arg_count - 1; i >= 0; i--) fprintf(cg->out, "    pop %s\n", reg_params[i]);
         fprintf(cg->out, "    call %s\n    push rax\n", node->data.func_call.name);
+    } else if (node->type == AST_ADDR_OF) {
+        if (node->data.addr_of.expr->type == AST_VARIABLE) {
+            Symbol *s = symtab_lookup(cg->tab, node->data.addr_of.expr->data.var_name);
+            fprintf(cg->out, "    lea rax, [rbp - %d]\n", s->stack_offset);
+            fprintf(cg->out, "    push rax\n");
+        } else if (node->data.addr_of.expr->type == AST_ARRAY_ACCESS) {
+            Symbol *s = symtab_lookup(cg->tab, node->data.addr_of.expr->data.array_access.name);
+            gen_expression(cg, node->data.addr_of.expr->data.array_access.index);
+            fprintf(cg->out, "    pop rbx\n    imul rbx, 8\n    mov rcx, rbp\n    sub rcx, %d\n    add rcx, rbx\n    push rcx\n", s->stack_offset);
+        }
+    } else if (node->type == AST_DEREF) {
+        gen_expression(cg, node->data.deref.expr);
+        fprintf(cg->out, "    pop rax\n    mov rax, [rax]\n    push rax\n");
     } else if (node->type == AST_SYSCALL) {
         char *reg_syscall[] = {"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"};
         for (int i = 0; i < node->data.syscall.arg_count; i++) gen_expression(cg, node->data.syscall.args[i]);
@@ -60,9 +73,19 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
         gen_expression(cg, node->data.bin_op.right);
         fprintf(cg->out, "    pop rbx\n    pop rax\n");
         char *op = node->data.bin_op.op;
-        if (strcmp(op, "+") == 0) fprintf(cg->out, "    add rax, rbx\n");
-        else if (strcmp(op, "-") == 0) fprintf(cg->out, "    sub rax, rbx\n");
-        else if (strcmp(op, "*") == 0) fprintf(cg->out, "    imul rax, rbx\n");
+        if (strcmp(op, "+") == 0) {
+            if (is_pointer(node->data.bin_op.left->eval_type)) {
+                fprintf(cg->out, "    imul rbx, 8\n");
+            } else if (is_pointer(node->data.bin_op.right->eval_type)) {
+                fprintf(cg->out, "    imul rax, 8\n");
+            }
+            fprintf(cg->out, "    add rax, rbx\n");
+        } else if (strcmp(op, "-") == 0) {
+            if (is_pointer(node->data.bin_op.left->eval_type)) {
+                fprintf(cg->out, "    imul rbx, 8\n");
+            }
+            fprintf(cg->out, "    sub rax, rbx\n");
+        } else if (strcmp(op, "*") == 0) fprintf(cg->out, "    imul rax, rbx\n");
         else if (strcmp(op, "/") == 0) { fprintf(cg->out, "    xor rdx, rdx\n    idiv rbx\n"); }
         else if (strcmp(op, "==") == 0) { fprintf(cg->out, "    cmp rax, rbx\n    sete al\n    movzx rax, al\n"); }
         else if (strcmp(op, "!=") == 0) { fprintf(cg->out, "    cmp rax, rbx\n    setne al\n    movzx rax, al\n"); }
@@ -157,6 +180,10 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         fprintf(cg->out, "    pop rbx\n    pop rax\n");
         Symbol *s = symtab_lookup(cg->tab, node->data.array_assign.name);
         fprintf(cg->out, "    imul rbx, 8\n    mov rcx, rbp\n    sub rcx, %d\n    mov [rcx + rbx], rax\n", s->stack_offset);
+    } else if (node->type == AST_DEREF_ASSIGN) {
+        gen_expression(cg, node->data.deref_assign.value);
+        gen_expression(cg, node->data.deref_assign.ptr);
+        fprintf(cg->out, "    pop rbx ; address\n    pop rax ; value\n    mov [rbx], rax\n");
     } else if (node->type == AST_PRINT) {
         gen_expression(cg, node->data.print_expr);
         fprintf(cg->out, "    pop rdi\n");

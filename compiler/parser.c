@@ -78,13 +78,30 @@ static ASTNode *parse_primary(Parser *p) {
     return n;
 }
 
+static ASTNode *parse_unary(Parser *p) {
+    if (p->current_token.type == TOKEN_STAR) {
+        Token t = p->current_token;
+        eat(p, TOKEN_STAR);
+        ASTNode *node = ast_new_deref(parse_unary(p));
+        ast_set_loc(node, t.line, t.col);
+        return node;
+    } else if (p->current_token.type == TOKEN_AMPERSAND) {
+        Token t = p->current_token;
+        eat(p, TOKEN_AMPERSAND);
+        ASTNode *node = ast_new_addr_of(parse_unary(p));
+        ast_set_loc(node, t.line, t.col);
+        return node;
+    }
+    return parse_primary(p);
+}
+
 static ASTNode *parse_term(Parser *p) {
-    ASTNode *left = parse_primary(p);
+    ASTNode *left = parse_unary(p);
     while (p->current_token.type == TOKEN_STAR || p->current_token.type == TOKEN_SLASH) {
         Token op_t = p->current_token;
         char *op = (op_t.type == TOKEN_STAR) ? "*" : "/";
         eat(p, op_t.type);
-        ASTNode *right = parse_primary(p);
+        ASTNode *right = parse_unary(p);
         left = ast_new_bin_op(op, left, right);
         ast_set_loc(left, op_t.line, op_t.col);
     }
@@ -159,6 +176,11 @@ static ASTNode *parse_statement(Parser *p) {
             default: type = TYPE_UNKNOWN; break;
         }
         eat(p, t.type);
+        if (p->current_token.type == TOKEN_STAR) {
+            eat(p, TOKEN_STAR);
+            type = TYPE_PTR;
+        }
+
         char *name = strdup(p->current_token.value);
         eat(p, TOKEN_ID);
         
@@ -305,6 +327,21 @@ static ASTNode *parse_statement(Parser *p) {
         ASTNode *expr = parse_expression(p);
         eat(p, TOKEN_SEMICOLON);
         ASTNode *node = ast_new_return(expr);
+        ast_set_loc(node, t.line, t.col);
+        return node;
+    } else if (t.type == TOKEN_STAR) {
+        // Assignment to dereference: *p = 10;
+        eat(p, TOKEN_STAR);
+        ASTNode *ptr = parse_unary(p); // Usually a variable or complex expr
+        eat(p, TOKEN_ASSIGN);
+        ASTNode *val = parse_expression(p);
+        eat(p, TOKEN_SEMICOLON);
+        // I need a new AST node for deref assignment or reuse something.
+        // I'll add AST_DEREF_ASSIGN.
+        ASTNode *node = malloc(sizeof(ASTNode));
+        node->type = AST_DEREF_ASSIGN; // Need to add this to ASTNodeType
+        node->data.deref_assign.ptr = ptr;
+        node->data.deref_assign.value = val;
         ast_set_loc(node, t.line, t.col);
         return node;
     } else if (t.type == TOKEN_MATCH) {

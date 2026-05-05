@@ -8,11 +8,14 @@ typedef enum {
     AST_ARRAY_DECL,
     AST_ASSIGN,
     AST_ARRAY_ASSIGN,
+    AST_DEREF_ASSIGN,
     AST_FUNC_DECL,
     AST_EXTERN_DECL,
     AST_SYSCALL,
     AST_FUNC_CALL,
     AST_RETURN,
+    AST_ADDR_OF,
+    AST_DEREF,
     AST_BIN_OP,
     AST_NUMBER,
     AST_BOOL,
@@ -38,10 +41,13 @@ typedef struct ASTNode {
         struct { Type type; char *name; int size; } array_decl;
         struct { char *name; struct ASTNode *value; } assign;
         struct { char *name; struct ASTNode *index; struct ASTNode *value; } array_assign;
+        struct { struct ASTNode *ptr; struct ASTNode *value; } deref_assign;
         struct { char *name; Type return_type; struct { Type type; char *name; } params[8]; int param_count; struct ASTNode *body; } func_decl;
         struct { char *name; struct ASTNode *args[8]; int arg_count; } func_call;
         struct { struct ASTNode *args[7]; int arg_count; } syscall;
         struct { struct ASTNode *expr; } ret;
+        struct { struct ASTNode *expr; } addr_of;
+        struct { struct ASTNode *expr; } deref;
         struct { char *op; struct ASTNode *left; struct ASTNode *right; } bin_op;
         int number;
         int bool_val; // 0 or 1
@@ -71,6 +77,8 @@ ASTNode *ast_new_extern_decl(char *name, Type return_type);
 ASTNode *ast_new_func_call(char *name);
 ASTNode *ast_new_syscall();
 ASTNode *ast_new_return(ASTNode *expr);
+ASTNode *ast_new_addr_of(ASTNode *expr);
+ASTNode *ast_new_deref(ASTNode *expr);
 ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right);
 ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value);
 ASTNode *ast_new_array_decl(Type type, char *name, int size);

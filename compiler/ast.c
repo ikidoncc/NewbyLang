@@ -135,6 +135,24 @@ ASTNode *ast_new_return(ASTNode *expr) {
     return node;
 }
 
+ASTNode *ast_new_addr_of(ASTNode *expr) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_ADDR_OF;
+    node->data.addr_of.expr = expr;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_deref(ASTNode *expr) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_DEREF;
+    node->data.deref.expr = expr;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
 void ast_func_add_param(ASTNode *func, Type type, char *name) {
     int i = func->data.func_decl.param_count++;
     func->data.func_decl.params[i].type = type;

@@ -13,13 +13,13 @@ Lexer *lexer_new(const char *src) {
     return lexer;
 }
 
-static Token create_token(TokenType type, const char *value, int line, int col) {
-    Token token;
-    token.type = type;
-    token.value = value ? strdup(value) : NULL;
-    token.line = line;
-    token.col = col;
-    return token;
+static Token create_token(TokenType type, const char *val, int line, int col) {
+    Token t;
+    t.type = type;
+    t.value = val ? strdup(val) : NULL;
+    t.line = line;
+    t.col = col;
+    return t;
 }
 
 void token_free(Token token) {
@@ -39,37 +39,33 @@ Token lexer_next_token(Lexer *lexer) {
 
     int start_line = lexer->line;
     int start_col = lexer->col;
-    char c = lexer->src[lexer->pos];
 
-    if (c == '\0') return create_token(TOKEN_EOF, NULL, start_line, start_col);
-
-    if (isdigit(c)) {
-        int start = lexer->pos;
-        int is_float = 0;
-        while (isdigit(lexer->src[lexer->pos]) || lexer->src[lexer->pos] == '.') {
-            if (lexer->src[lexer->pos] == '.') is_float = 1;
-            lexer->pos++;
-            lexer->col++;
-        }
-        int len = lexer->pos - start;
-        char *val = malloc(len + 1);
-        strncpy(val, lexer->src + start, len);
-        val[len] = '\0';
-        Token t = create_token(is_float ? TOKEN_FLOAT_LIT : TOKEN_NUMBER, val, start_line, start_col);
-        free(val);
-        return t;
+    if (lexer->src[lexer->pos] == '\0') {
+        return create_token(TOKEN_EOF, NULL, start_line, start_col);
     }
 
-    if (isalpha(c)) {
-        int start = lexer->pos;
-        while (isalnum(lexer->src[lexer->pos])) {
-            lexer->pos++;
+    char c = lexer->src[lexer->pos];
+
+    if (isdigit(c)) {
+        char val[64];
+        int i = 0;
+        while (isdigit(lexer->src[lexer->pos]) || lexer->src[lexer->pos] == '.') {
+            val[i++] = lexer->src[lexer->pos++];
             lexer->col++;
         }
-        int len = lexer->pos - start;
-        char *val = malloc(len + 1);
-        strncpy(val, lexer->src + start, len);
-        val[len] = '\0';
+        val[i] = '\0';
+        if (strchr(val, '.')) return create_token(TOKEN_FLOAT_LIT, val, start_line, start_col);
+        return create_token(TOKEN_NUMBER, val, start_line, start_col);
+    }
+
+    if (isalpha(c) || c == '_') {
+        char val[64];
+        int i = 0;
+        while (isalnum(lexer->src[lexer->pos]) || lexer->src[lexer->pos] == '_') {
+            val[i++] = lexer->src[lexer->pos++];
+            lexer->col++;
+        }
+        val[i] = '\0';
 
         Token t;
         if (strcmp(val, "int") == 0) t = create_token(TOKEN_INT, NULL, start_line, start_col);
@@ -96,29 +92,24 @@ Token lexer_next_token(Lexer *lexer) {
         else if (strcmp(val, "print") == 0) t = create_token(TOKEN_PRINT, NULL, start_line, start_col);
         else t = create_token(TOKEN_ID, val, start_line, start_col);
 
-        free(val);
         return t;
     }
 
     if (c == '"') {
         lexer->pos++;
         lexer->col++;
-        int start = lexer->pos;
+        char val[256];
+        int i = 0;
         while (lexer->src[lexer->pos] != '"' && lexer->src[lexer->pos] != '\0') {
-            lexer->pos++;
+            val[i++] = lexer->src[lexer->pos++];
             lexer->col++;
         }
-        int len = lexer->pos - start;
-        char *val = malloc(len + 1);
-        strncpy(val, lexer->src + start, len);
-        val[len] = '\0';
+        val[i] = '\0';
         if (lexer->src[lexer->pos] == '"') {
             lexer->pos++;
             lexer->col++;
         }
-        Token t = create_token(TOKEN_STRING_LIT, val, start_line, start_col);
-        free(val);
-        return t;
+        return create_token(TOKEN_STRING_LIT, val, start_line, start_col);
     }
 
     char next = lexer->src[lexer->pos + 1];
@@ -133,7 +124,7 @@ Token lexer_next_token(Lexer *lexer) {
             return create_token(TOKEN_UNKNOWN, NULL, start_line, start_col);
         case '&':
             if (next == '&') { lexer->pos++; lexer->col++; return create_token(TOKEN_AND, NULL, start_line, start_col); }
-            return create_token(TOKEN_UNKNOWN, NULL, start_line, start_col);
+            return create_token(TOKEN_AMPERSAND, NULL, start_line, start_col);
         case '|':
             if (next == '|') { lexer->pos++; lexer->col++; return create_token(TOKEN_OR, NULL, start_line, start_col); }
             return create_token(TOKEN_UNKNOWN, NULL, start_line, start_col);
@@ -143,7 +134,6 @@ Token lexer_next_token(Lexer *lexer) {
         case '-': return create_token(TOKEN_MINUS, NULL, start_line, start_col);
         case '*': return create_token(TOKEN_STAR, NULL, start_line, start_col);
         case '/': return create_token(TOKEN_SLASH, NULL, start_line, start_col);
-        case '&': return create_token(TOKEN_AMPERSAND, NULL, start_line, start_col);
         case ';': return create_token(TOKEN_SEMICOLON, NULL, start_line, start_col);
         case ':': return create_token(TOKEN_COLON, NULL, start_line, start_col);
         case ',': return create_token(TOKEN_COMMA, NULL, start_line, start_col);

@@ -11,6 +11,7 @@ typedef enum {
     TYPE_UINT,
     TYPE_UINT8,
     TYPE_UINT32,
+    TYPE_PTR,
     TYPE_UNKNOWN
 } Type;
 
@@ -25,8 +26,13 @@ static inline const char* type_to_string(Type t) {
         case TYPE_UINT: return "uint";
         case TYPE_UINT8: return "uint8";
         case TYPE_UINT32: return "uint32";
+        case TYPE_PTR: return "pointer";
         default: return "unknown";
     }
+}
+
+static inline int is_pointer(Type t) {
+    return t == TYPE_PTR;
 }
 
 #endif

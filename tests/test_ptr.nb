@@ -1,0 +1,15 @@
+int x = 10;
+int* p = &x;
+print(x);
+print(*p);
+*p = 20;
+print(x);
+print(*p);
+
+int arr[3];
+arr[0] = 100;
+arr[1] = 200;
+int* p2 = &arr[0];
+print(*p2);
+int* p3 = p2 + 1;
+print(*p3);
