@@ -117,6 +117,14 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
         }
 
+        case AST_SYSCALL: {
+            for (int i = 0; i < node->data.syscall.arg_count; i++) {
+                semantic_analyze(node->data.syscall.args[i], tab);
+            }
+            node->eval_type = TYPE_INT;
+            break;
+        }
+
         case AST_RETURN:
             semantic_analyze(node->data.ret.expr, tab);
             node->eval_type = node->data.ret.expr->eval_type;

@@ -117,6 +117,15 @@ ASTNode *ast_new_func_call(char *name) {
     return node;
 }
 
+ASTNode *ast_new_syscall() {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_SYSCALL;
+    node->data.syscall.arg_count = 0;
+    node->eval_type = TYPE_INT;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
 ASTNode *ast_new_return(ASTNode *expr) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_RETURN;
@@ -135,6 +144,11 @@ void ast_func_add_param(ASTNode *func, Type type, char *name) {
 void ast_call_add_arg(ASTNode *call, ASTNode *arg) {
     int i = call->data.func_call.arg_count++;
     call->data.func_call.args[i] = arg;
+}
+
+void ast_syscall_add_arg(ASTNode *syscall, ASTNode *arg) {
+    int i = syscall->data.syscall.arg_count++;
+    syscall->data.syscall.args[i] = arg;
 }
 
 ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {
@@ -225,12 +239,10 @@ ASTNode *ast_new_match(ASTNode *expr) {
 void ast_match_add_case(ASTNode *match, int val, ASTNode *stmt) {
     match->data.match.case_count++;
     match->data.match.cases = realloc(match->data.match.cases, sizeof(ASTNode*) * match->data.match.case_count);
-    
     ASTNode *c = malloc(sizeof(ASTNode));
     c->type = AST_CASE;
     c->data.match_case.val = val;
     c->data.match_case.stmt = stmt;
-    
     match->data.match.cases[match->data.match.case_count - 1] = c;
 }
 

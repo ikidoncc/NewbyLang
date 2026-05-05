@@ -7,7 +7,7 @@ Este documento descreve as funcionalidades essenciais que o **Newby** precisa su
 ## 1. Interoperabilidade e Baixo Nível (FFI)
 Permitir que a linguagem interaja com o sistema operacional e bibliotecas C existentes.
 - [x] **Palavra-chave `extern`**: Declarar funções externas sem corpo (ex: `extern func printf(string fmt);`).
-- [ ] **Chamadas de Sistema (`syscall`)**: Suporte nativo para invocar interrupções do kernel.
+- [x] **Chamadas de Sistema (`syscall`)**: Suporte nativo para invocar interrupções do kernel.
 - [x] **Linking Externo**: Atualizar o compilador para aceitar bibliotecas externas (ex: `-lc`) no passo de linkagem.
 
 ## 2. Sistema de Tipos Avançado

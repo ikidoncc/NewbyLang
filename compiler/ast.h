@@ -10,6 +10,7 @@ typedef enum {
     AST_ARRAY_ASSIGN,
     AST_FUNC_DECL,
     AST_EXTERN_DECL,
+    AST_SYSCALL,
     AST_FUNC_CALL,
     AST_RETURN,
     AST_BIN_OP,
@@ -39,6 +40,7 @@ typedef struct ASTNode {
         struct { char *name; struct ASTNode *index; struct ASTNode *value; } array_assign;
         struct { char *name; Type return_type; struct { Type type; char *name; } params[8]; int param_count; struct ASTNode *body; } func_decl;
         struct { char *name; struct ASTNode *args[8]; int arg_count; } func_call;
+        struct { struct ASTNode *args[7]; int arg_count; } syscall;
         struct { struct ASTNode *expr; } ret;
         struct { char *op; struct ASTNode *left; struct ASTNode *right; } bin_op;
         int number;
@@ -67,6 +69,7 @@ ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value);
 ASTNode *ast_new_func_decl(char *name, Type return_type);
 ASTNode *ast_new_extern_decl(char *name, Type return_type);
 ASTNode *ast_new_func_call(char *name);
+ASTNode *ast_new_syscall();
 ASTNode *ast_new_return(ASTNode *expr);
 ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right);
 ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value);
@@ -78,6 +81,7 @@ ASTNode *ast_new_while(ASTNode *condition, ASTNode *body);
 ASTNode *ast_new_match(ASTNode *expr);
 void ast_func_add_param(ASTNode *func, Type type, char *name);
 void ast_call_add_arg(ASTNode *call, ASTNode *arg);
+void ast_syscall_add_arg(ASTNode *syscall, ASTNode *arg);
 void ast_match_add_case(ASTNode *match, int val, ASTNode *stmt);
 void ast_match_set_default(ASTNode *match, ASTNode *stmt);
 void ast_program_add(ASTNode *program, ASTNode *node);

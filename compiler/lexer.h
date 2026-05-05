@@ -18,6 +18,7 @@ typedef enum {
     TOKEN_WHILE,
     TOKEN_FUNC,
     TOKEN_EXTERN,
+    TOKEN_SYSCALL,
     TOKEN_RETURN,
     TOKEN_MATCH,
     TOKEN_CASE,
@@ -31,6 +32,7 @@ typedef enum {
     TOKEN_MINUS,    // -
     TOKEN_STAR,     // *
     TOKEN_SLASH,    // /
+    TOKEN_AMPERSAND, // &
     TOKEN_EQ,       // ==
     TOKEN_NEQ,      // !=
     TOKEN_LT,       // <

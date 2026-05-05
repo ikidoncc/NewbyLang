@@ -60,6 +60,15 @@ static ASTNode *parse_primary(Parser *p) {
         } else {
             n = ast_new_variable(name);
         }
+    } else if (t.type == TOKEN_SYSCALL) {
+        eat(p, TOKEN_SYSCALL);
+        eat(p, TOKEN_LPAREN);
+        n = ast_new_syscall();
+        while (p->current_token.type != TOKEN_RPAREN) {
+            ast_syscall_add_arg(n, parse_expression(p));
+            if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
+        }
+        eat(p, TOKEN_RPAREN);
     } else if (t.type == TOKEN_LPAREN) {
         eat(p, TOKEN_LPAREN);
         n = parse_expression(p);
@@ -326,6 +335,10 @@ static ASTNode *parse_statement(Parser *p) {
         
         eat(p, TOKEN_RBRACE);
         return match_node;
+    } else if (t.type == TOKEN_SYSCALL) {
+        ASTNode *node = parse_expression(p);
+        eat(p, TOKEN_SEMICOLON);
+        return node;
     } else if (t.type == TOKEN_ID) {
         char *name = strdup(t.value);
         eat(p, TOKEN_ID);
@@ -363,7 +376,9 @@ static ASTNode *parse_statement(Parser *p) {
             exit(1);
         }
     }
-    return NULL;
+    
+    fprintf(stderr, "Syntax Error [%d:%d]: Unexpected token type %d\n", t.line, t.col, t.type);
+    exit(1);
 }
 
 ASTNode *parser_parse(Parser *p) {

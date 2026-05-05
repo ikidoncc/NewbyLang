@@ -1,0 +1,3 @@
+string msg = "Hello\n";
+syscall(1, 1, msg, 6);
+syscall(60, 42);
