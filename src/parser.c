@@ -49,6 +49,14 @@ static ASTNode *parse_primary(Parser *p) {
             ASTNode *index = parse_expression(p);
             eat(p, TOKEN_RBRACKET);
             n = ast_new_array_access(name, index);
+        } else if (p->current_token.type == TOKEN_LPAREN) {
+            eat(p, TOKEN_LPAREN);
+            n = ast_new_func_call(name);
+            while (p->current_token.type != TOKEN_RPAREN) {
+                ast_call_add_arg(n, parse_expression(p));
+                if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA); // Wait, TOKEN_COMMA not in lexer!
+            }
+            eat(p, TOKEN_RPAREN);
         } else {
             n = ast_new_variable(name);
         }
@@ -229,6 +237,46 @@ static ASTNode *parse_statement(Parser *p) {
         ASTNode *node = ast_new_while(condition, body);
         ast_set_loc(node, t.line, t.col);
         return node;
+    } else if (t.type == TOKEN_FUNC) {
+        eat(p, TOKEN_FUNC);
+        Type ret_type = TYPE_INT; // Default
+        if (p->current_token.type == TOKEN_INT || p->current_token.type == TOKEN_BOOL || p->current_token.type == TOKEN_STRING) {
+             // Optional return type
+             // For now keep it simple and just parse name
+        }
+        char *name = strdup(p->current_token.value);
+        eat(p, TOKEN_ID);
+        ASTNode *node = ast_new_func_decl(name, ret_type);
+        eat(p, TOKEN_LPAREN);
+        while (p->current_token.type != TOKEN_RPAREN) {
+            Type p_type = TYPE_INT; // Simplified
+            if (p->current_token.type == TOKEN_INT) eat(p, TOKEN_INT);
+            else if (p->current_token.type == TOKEN_BOOL) { eat(p, TOKEN_BOOL); p_type = TYPE_BOOL; }
+            else if (p->current_token.type == TOKEN_STRING) { eat(p, TOKEN_STRING); p_type = TYPE_STRING; }
+            
+            char *p_name = strdup(p->current_token.value);
+            eat(p, TOKEN_ID);
+            ast_func_add_param(node, p_type, p_name);
+            if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
+        }
+        eat(p, TOKEN_RPAREN);
+        
+        eat(p, TOKEN_LBRACE);
+        ASTNode *body = ast_new_program();
+        while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) {
+            ast_program_add(body, parse_statement(p));
+        }
+        eat(p, TOKEN_RBRACE);
+        node->data.func_decl.body = body;
+        ast_set_loc(node, t.line, t.col);
+        return node;
+    } else if (t.type == TOKEN_RETURN) {
+        eat(p, TOKEN_RETURN);
+        ASTNode *expr = parse_expression(p);
+        eat(p, TOKEN_SEMICOLON);
+        ASTNode *node = ast_new_return(expr);
+        ast_set_loc(node, t.line, t.col);
+        return node;
     } else if (t.type == TOKEN_MATCH) {
         eat(p, TOKEN_MATCH);
         eat(p, TOKEN_LPAREN);
@@ -277,8 +325,19 @@ static ASTNode *parse_statement(Parser *p) {
             ASTNode *node = ast_new_assign(name, val);
             ast_set_loc(node, t.line, t.col);
             return node;
+        } else if (p->current_token.type == TOKEN_LPAREN) {
+            eat(p, TOKEN_LPAREN);
+            ASTNode *node = ast_new_func_call(name);
+            while (p->current_token.type != TOKEN_RPAREN) {
+                ast_call_add_arg(node, parse_expression(p));
+                if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
+            }
+            eat(p, TOKEN_RPAREN);
+            eat(p, TOKEN_SEMICOLON);
+            ast_set_loc(node, t.line, t.col);
+            return node;
         } else {
-            fprintf(stderr, "Syntax Error [%d:%d]: Expected '=' or '[' after variable name\n", 
+            fprintf(stderr, "Syntax Error [%d:%d]: Expected '=', '[' or '(' after variable name\n", 
                     p->current_token.line, p->current_token.col);
             exit(1);
         }

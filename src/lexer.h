@@ -16,6 +16,8 @@ typedef enum {
     TOKEN_IF,
     TOKEN_ELSE,
     TOKEN_WHILE,
+    TOKEN_FUNC,
+    TOKEN_RETURN,
     TOKEN_MATCH,
     TOKEN_CASE,
     TOKEN_DEFAULT,
@@ -36,6 +38,7 @@ typedef enum {
     TOKEN_OR,       // ||
     TOKEN_SEMICOLON, // ;
     TOKEN_COLON,     // :
+    TOKEN_COMMA,     // ,
     TOKEN_LPAREN,   // (
     TOKEN_RPAREN,   // )
     TOKEN_LBRACKET, // [

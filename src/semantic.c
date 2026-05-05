@@ -82,6 +82,39 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
         }
 
+        case AST_FUNC_DECL: {
+            // Add function to current scope (global)
+            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 0, 0);
+            Symbol *s = symtab_lookup(tab, node->data.func_decl.name);
+            s->is_array = 2; // Hack: 2 means function
+            
+            SymbolTable *func_tab = symtab_new(tab);
+            for (int i = 0; i < node->data.func_decl.param_count; i++) {
+                symtab_add(func_tab, node->data.func_decl.params[i].name, 0, node->data.func_decl.params[i].type, 0, 0);
+            }
+            semantic_analyze(node->data.func_decl.body, func_tab);
+            break;
+        }
+
+        case AST_FUNC_CALL: {
+            Symbol *s = symtab_lookup(tab, node->data.func_call.name);
+            if (!s || s->is_array != 2) {
+                fprintf(stderr, "Semantic Error [%d:%d]: Undefined function '%s'\n",
+                        node->line, node->col, node->data.func_call.name);
+                exit(1);
+            }
+            for (int i = 0; i < node->data.func_call.arg_count; i++) {
+                semantic_analyze(node->data.func_call.args[i], tab);
+            }
+            node->eval_type = s->type;
+            break;
+        }
+
+        case AST_RETURN:
+            semantic_analyze(node->data.ret.expr, tab);
+            node->eval_type = node->data.ret.expr->eval_type;
+            break;
+
         case AST_BIN_OP:
             semantic_analyze(node->data.bin_op.left, tab);
             semantic_analyze(node->data.bin_op.right, tab);

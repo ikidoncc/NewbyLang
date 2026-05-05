@@ -83,6 +83,48 @@ ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value) {
     return node;
 }
 
+ASTNode *ast_new_func_decl(char *name, Type return_type) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_FUNC_DECL;
+    node->data.func_decl.name = strdup(name);
+    node->data.func_decl.return_type = return_type;
+    node->data.func_decl.param_count = 0;
+    node->data.func_decl.body = NULL;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_func_call(char *name) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_FUNC_CALL;
+    node->data.func_call.name = strdup(name);
+    node->data.func_call.arg_count = 0;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_return(ASTNode *expr) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_RETURN;
+    node->data.ret.expr = expr;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+void ast_func_add_param(ASTNode *func, Type type, char *name) {
+    int i = func->data.func_decl.param_count++;
+    func->data.func_decl.params[i].type = type;
+    func->data.func_decl.params[i].name = strdup(name);
+}
+
+void ast_call_add_arg(ASTNode *call, ASTNode *arg) {
+    int i = call->data.func_call.arg_count++;
+    call->data.func_call.args[i] = arg;
+}
+
 ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_BIN_OP;
