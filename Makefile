@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -Wall -g -Isrc
-SRC = src/lexer.c src/ast.c src/parser.c src/symtab.c src/semantic.c src/codegen.c src/main.c
+CFLAGS = -Wall -g -Icompiler
+SRC = compiler/lexer.c compiler/ast.c compiler/parser.c compiler/symtab.c compiler/semantic.c compiler/codegen.c compiler/main.c
 OBJ = $(SRC:.c=.o)
 TARGET = nbc
 
@@ -10,9 +10,8 @@ $(TARGET): $(OBJ)
 	$(CC) $(OBJ) -o $(TARGET)
 
 run: $(TARGET)
-	./$(TARGET) hello.nb
+	./$(TARGET) tests/hello.nb
 	./hello
 
 clean:
-	rm -f $(OBJ) $(TARGET) hello output.asm output.o output
-
+	rm -f $(OBJ) $(TARGET) hello output.asm output.o output tests/*.asm tests/*.o tests/hello tests/test_*
