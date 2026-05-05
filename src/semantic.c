@@ -17,7 +17,6 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             for (int i = 0; i < node->data.program.count; i++) {
                 semantic_analyze(node->data.program.nodes[i], new_tab);
             }
-            // Free new_tab here if we had a free function, but for now we'll leave it
             break;
         }
 
@@ -30,13 +29,22 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
                         type_to_string(node->data.var_decl.value->eval_type));
                 exit(1);
             }
-            symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type);
+            symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type, 0, 0);
+            break;
+
+        case AST_ARRAY_DECL:
+            symtab_add(tab, node->data.array_decl.name, 0, node->data.array_decl.type, 1, node->data.array_decl.size);
             break;
 
         case AST_ASSIGN: {
             Symbol *s = symtab_lookup(tab, node->data.assign.name);
             if (!s) {
                 fprintf(stderr, "Semantic Error [%d:%d]: Assignment to undefined variable '%s'\n",
+                        node->line, node->col, node->data.assign.name);
+                exit(1);
+            }
+            if (s->is_array) {
+                fprintf(stderr, "Semantic Error [%d:%d]: Cannot assign to array '%s' without index\n",
                         node->line, node->col, node->data.assign.name);
                 exit(1);
             }
@@ -51,6 +59,29 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
         }
 
+        case AST_ARRAY_ASSIGN: {
+            Symbol *s = symtab_lookup(tab, node->data.array_assign.name);
+            if (!s || !s->is_array) {
+                fprintf(stderr, "Semantic Error [%d:%d]: '%s' is not an array or undefined\n",
+                        node->line, node->col, node->data.array_assign.name);
+                exit(1);
+            }
+            semantic_analyze(node->data.array_assign.index, tab);
+            if (!is_integer_type(node->data.array_assign.index->eval_type)) {
+                fprintf(stderr, "Semantic Error [%d:%d]: Array index must be an integer\n",
+                        node->line, node->col);
+                exit(1);
+            }
+            semantic_analyze(node->data.array_assign.value, tab);
+            if (node->data.array_assign.value->eval_type != s->type) {
+                fprintf(stderr, "Semantic Error [%d:%d]: Type mismatch in array assignment. Expected %s, got %s\n",
+                        node->line, node->col, type_to_string(s->type),
+                        type_to_string(node->data.array_assign.value->eval_type));
+                exit(1);
+            }
+            break;
+        }
+
         case AST_BIN_OP:
             semantic_analyze(node->data.bin_op.left, tab);
             semantic_analyze(node->data.bin_op.right, tab);
@@ -59,14 +90,14 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             Type right_t = node->data.bin_op.right->eval_type;
             char *op = node->data.bin_op.op;
 
-            if (strcmp(op, "+") == 0) {
+            if (strcmp(op, "+") == 0 || strcmp(op, "-") == 0 || strcmp(op, "*") == 0 || strcmp(op, "/") == 0) {
                 if (is_integer_type(left_t) && is_integer_type(right_t)) {
                     node->eval_type = left_t;
                 } else if (left_t == TYPE_FLOAT && right_t == TYPE_FLOAT) {
                     node->eval_type = TYPE_FLOAT;
                 } else {
-                    fprintf(stderr, "Semantic Error [%d:%d]: '+' operator incompatible types: %s and %s\n",
-                            node->line, node->col, type_to_string(left_t), type_to_string(right_t));
+                    fprintf(stderr, "Semantic Error [%d:%d]: '%s' operator incompatible types: %s and %s\n",
+                            node->line, node->col, op, type_to_string(left_t), type_to_string(right_t));
                     exit(1);
                 }
             } else if (strcmp(op, "==") == 0 || strcmp(op, "!=") == 0 ||
@@ -94,6 +125,23 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             if (!s) {
                 fprintf(stderr, "Semantic Error [%d:%d]: Undefined variable '%s'\n", 
                         node->line, node->col, node->data.var_name);
+                exit(1);
+            }
+            node->eval_type = s->type;
+            break;
+        }
+
+        case AST_ARRAY_ACCESS: {
+            Symbol *s = symtab_lookup(tab, node->data.array_access.name);
+            if (!s || !s->is_array) {
+                fprintf(stderr, "Semantic Error [%d:%d]: '%s' is not an array or undefined\n",
+                        node->line, node->col, node->data.array_access.name);
+                exit(1);
+            }
+            semantic_analyze(node->data.array_access.index, tab);
+            if (!is_integer_type(node->data.array_access.index->eval_type)) {
+                fprintf(stderr, "Semantic Error [%d:%d]: Array index must be an integer\n",
+                        node->line, node->col);
                 exit(1);
             }
             node->eval_type = s->type;

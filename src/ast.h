@@ -5,13 +5,16 @@
 
 typedef enum {
     AST_VAR_DECL,
+    AST_ARRAY_DECL,
     AST_ASSIGN,
+    AST_ARRAY_ASSIGN,
     AST_BIN_OP,
     AST_NUMBER,
     AST_BOOL,
     AST_FLOAT,
     AST_STRING,
     AST_VARIABLE,
+    AST_ARRAY_ACCESS,
     AST_PRINT,
     AST_PROGRAM,
     AST_IF,
@@ -27,13 +30,16 @@ typedef struct ASTNode {
     int col;
     union {
         struct { Type type; char *name; struct ASTNode *value; } var_decl;
+        struct { Type type; char *name; int size; } array_decl;
         struct { char *name; struct ASTNode *value; } assign;
+        struct { char *name; struct ASTNode *index; struct ASTNode *value; } array_assign;
         struct { char *op; struct ASTNode *left; struct ASTNode *right; } bin_op;
         int number;
         int bool_val; // 0 or 1
         double float_val;
         char *string_val;
         char *var_name;
+        struct { char *name; struct ASTNode *index; } array_access;
         struct ASTNode *print_expr;
         struct { struct ASTNode **nodes; int count; } program;
         struct { struct ASTNode *condition; struct ASTNode *then_branch; struct ASTNode *else_branch; } if_stmt;
@@ -48,9 +54,12 @@ ASTNode *ast_new_bool(int val);
 ASTNode *ast_new_float(double val);
 ASTNode *ast_new_string(char *val);
 ASTNode *ast_new_variable(char *name);
+ASTNode *ast_new_array_access(char *name, ASTNode *index);
 ASTNode *ast_new_assign(char *name, ASTNode *value);
+ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value);
 ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right);
 ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value);
+ASTNode *ast_new_array_decl(Type type, char *name, int size);
 ASTNode *ast_new_print(ASTNode *expr);
 ASTNode *ast_new_program();
 ASTNode *ast_new_if(ASTNode *condition, ASTNode *then_branch, ASTNode *else_branch);

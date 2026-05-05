@@ -143,6 +143,8 @@ Token lexer_next_token(Lexer *lexer) {
         case ':': return create_token(TOKEN_COLON, NULL, start_line, start_col);
         case '(': return create_token(TOKEN_LPAREN, NULL, start_line, start_col);
         case ')': return create_token(TOKEN_RPAREN, NULL, start_line, start_col);
+        case '[': return create_token(TOKEN_LBRACKET, NULL, start_line, start_col);
+        case ']': return create_token(TOKEN_RBRACKET, NULL, start_line, start_col);
         case '{': return create_token(TOKEN_LBRACE, NULL, start_line, start_col);
         case '}': return create_token(TOKEN_RBRACE, NULL, start_line, start_col);
         default: return create_token(TOKEN_UNKNOWN, NULL, start_line, start_col);

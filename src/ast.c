@@ -52,6 +52,16 @@ ASTNode *ast_new_variable(char *name) {
     return node;
 }
 
+ASTNode *ast_new_array_access(char *name, ASTNode *index) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_ARRAY_ACCESS;
+    node->data.array_access.name = strdup(name);
+    node->data.array_access.index = index;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
 ASTNode *ast_new_assign(char *name, ASTNode *value) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_ASSIGN;
@@ -62,7 +72,19 @@ ASTNode *ast_new_assign(char *name, ASTNode *value) {
     return node;
 }
 
-ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {    ASTNode *node = malloc(sizeof(ASTNode));
+ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_ARRAY_ASSIGN;
+    node->data.array_assign.name = strdup(name);
+    node->data.array_assign.index = index;
+    node->data.array_assign.value = value;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {
+    ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_BIN_OP;
     node->data.bin_op.op = strdup(op);
     node->data.bin_op.left = left;
@@ -78,6 +100,17 @@ ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value) {
     node->data.var_decl.type = type;
     node->data.var_decl.name = strdup(name);
     node->data.var_decl.value = value;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_array_decl(Type type, char *name, int size) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_ARRAY_DECL;
+    node->data.array_decl.type = type;
+    node->data.array_decl.name = strdup(name);
+    node->data.array_decl.size = size;
     node->eval_type = TYPE_UNKNOWN;
     ast_set_loc(node, 0, 0);
     return node;

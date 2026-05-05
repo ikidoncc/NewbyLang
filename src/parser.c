@@ -42,8 +42,16 @@ static ASTNode *parse_primary(Parser *p) {
         n = ast_new_bool(0);
         eat(p, TOKEN_FALSE);
     } else if (t.type == TOKEN_ID) {
-        n = ast_new_variable(t.value);
+        char *name = strdup(t.value);
         eat(p, TOKEN_ID);
+        if (p->current_token.type == TOKEN_LBRACKET) {
+            eat(p, TOKEN_LBRACKET);
+            ASTNode *index = parse_expression(p);
+            eat(p, TOKEN_RBRACKET);
+            n = ast_new_array_access(name, index);
+        } else {
+            n = ast_new_variable(name);
+        }
     } else if (t.type == TOKEN_LPAREN) {
         eat(p, TOKEN_LPAREN);
         n = parse_expression(p);
@@ -136,12 +144,24 @@ static ASTNode *parse_statement(Parser *p) {
         eat(p, t.type);
         char *name = strdup(p->current_token.value);
         eat(p, TOKEN_ID);
-        eat(p, TOKEN_ASSIGN);
-        ASTNode *val = parse_expression(p);
-        eat(p, TOKEN_SEMICOLON);
-        ASTNode *node = ast_new_var_decl(type, name, val);
-        ast_set_loc(node, t.line, t.col);
-        return node;
+        
+        if (p->current_token.type == TOKEN_LBRACKET) {
+            eat(p, TOKEN_LBRACKET);
+            int size = atoi(p->current_token.value);
+            eat(p, TOKEN_NUMBER);
+            eat(p, TOKEN_RBRACKET);
+            eat(p, TOKEN_SEMICOLON);
+            ASTNode *node = ast_new_array_decl(type, name, size);
+            ast_set_loc(node, t.line, t.col);
+            return node;
+        } else {
+            eat(p, TOKEN_ASSIGN);
+            ASTNode *val = parse_expression(p);
+            eat(p, TOKEN_SEMICOLON);
+            ASTNode *node = ast_new_var_decl(type, name, val);
+            ast_set_loc(node, t.line, t.col);
+            return node;
+        }
     } else if (t.type == TOKEN_PRINT) {
         eat(p, TOKEN_PRINT);
         eat(p, TOKEN_LPAREN);
@@ -240,7 +260,17 @@ static ASTNode *parse_statement(Parser *p) {
     } else if (t.type == TOKEN_ID) {
         char *name = strdup(t.value);
         eat(p, TOKEN_ID);
-        if (p->current_token.type == TOKEN_ASSIGN) {
+        if (p->current_token.type == TOKEN_LBRACKET) {
+            eat(p, TOKEN_LBRACKET);
+            ASTNode *index = parse_expression(p);
+            eat(p, TOKEN_RBRACKET);
+            eat(p, TOKEN_ASSIGN);
+            ASTNode *val = parse_expression(p);
+            eat(p, TOKEN_SEMICOLON);
+            ASTNode *node = ast_new_array_assign(name, index, val);
+            ast_set_loc(node, t.line, t.col);
+            return node;
+        } else if (p->current_token.type == TOKEN_ASSIGN) {
             eat(p, TOKEN_ASSIGN);
             ASTNode *val = parse_expression(p);
             eat(p, TOKEN_SEMICOLON);
@@ -248,7 +278,7 @@ static ASTNode *parse_statement(Parser *p) {
             ast_set_loc(node, t.line, t.col);
             return node;
         } else {
-            fprintf(stderr, "Syntax Error [%d:%d]: Expected '=' after variable name\n", 
+            fprintf(stderr, "Syntax Error [%d:%d]: Expected '=' or '[' after variable name\n", 
                     p->current_token.line, p->current_token.col);
             exit(1);
         }

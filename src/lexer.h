@@ -38,6 +38,8 @@ typedef enum {
     TOKEN_COLON,     // :
     TOKEN_LPAREN,   // (
     TOKEN_RPAREN,   // )
+    TOKEN_LBRACKET, // [
+    TOKEN_RBRACKET, // ]
     TOKEN_LBRACE,   // {
     TOKEN_RBRACE,   // }
     TOKEN_PRINT,

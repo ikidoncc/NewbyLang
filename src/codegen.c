@@ -49,6 +49,27 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
         else if (size == 4) fprintf(cg->out, "    movsxd rax, dword [rbp - %d]\n", s->stack_offset);
         else fprintf(cg->out, "    mov rax, [rbp - %d]\n", s->stack_offset);
         fprintf(cg->out, "    push rax\n");
+    } else if (node->type == AST_ARRAY_ACCESS) {
+        Symbol *s = symtab_lookup(cg->tab, node->data.array_access.name);
+        gen_expression(cg, node->data.array_access.index);
+        fprintf(cg->out, "    pop rbx ; index\n");
+        
+        int element_size = 8;
+        if (s->type == TYPE_INT8 || s->type == TYPE_UINT8) element_size = 1;
+        else if (s->type == TYPE_INT32 || s->type == TYPE_UINT32) element_size = 4;
+        
+        fprintf(cg->out, "    imul rbx, %d\n", element_size);
+        fprintf(cg->out, "    mov rcx, rbp\n");
+        fprintf(cg->out, "    sub rcx, %d ; array base\n", s->stack_offset);
+        // stack_offset is the end of array, elements are at [rbp - offset + index*size]
+        // Wait, stack_pos grows. So array is from [rbp - stack_pos] to [rbp - (stack_pos - size)].
+        // Let's re-think: s->stack_offset is where we finished allocating the array.
+        // Array elements start at [rbp - s->stack_offset] (for index 0).
+        
+        if (element_size == 1) fprintf(cg->out, "    movsx rax, byte [rcx + rbx]\n");
+        else if (element_size == 4) fprintf(cg->out, "    movsxd rax, dword [rcx + rbx]\n");
+        else fprintf(cg->out, "    mov rax, [rcx + rbx]\n");
+        fprintf(cg->out, "    push rax\n");
     } else if (node->type == AST_BIN_OP) {
         gen_expression(cg, node->data.bin_op.left);
         gen_expression(cg, node->data.bin_op.right);
@@ -153,11 +174,21 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         else if (node->data.var_decl.type == TYPE_INT32 || node->data.var_decl.type == TYPE_UINT32) size = 4;
 
         cg->stack_pos += 8;
-        symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos, node->data.var_decl.type);
+        symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos, node->data.var_decl.type, 0, 0);
         fprintf(cg->out, "    pop rax\n");
         if (size == 1) fprintf(cg->out, "    mov [rbp - %d], al\n", cg->stack_pos);
         else if (size == 4) fprintf(cg->out, "    mov [rbp - %d], eax\n", cg->stack_pos);
         else fprintf(cg->out, "    mov [rbp - %d], rax\n", cg->stack_pos);
+    } else if (node->type == AST_ARRAY_DECL) {
+        int element_size = 8;
+        if (node->data.array_decl.type == TYPE_INT8 || node->data.array_decl.type == TYPE_UINT8) element_size = 1;
+        else if (node->data.array_decl.type == TYPE_INT32 || node->data.array_decl.type == TYPE_UINT32) element_size = 4;
+        
+        int total_size = node->data.array_decl.size * element_size;
+        int padded_size = (total_size + 7) & ~7;
+        
+        cg->stack_pos += padded_size;
+        symtab_add(cg->tab, node->data.array_decl.name, cg->stack_pos, node->data.array_decl.type, 1, node->data.array_decl.size);
     } else if (node->type == AST_ASSIGN) {
         gen_expression(cg, node->data.assign.value);
         Symbol *s = symtab_lookup(cg->tab, node->data.assign.name);
@@ -173,6 +204,24 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         if (size == 1) fprintf(cg->out, "    mov [rbp - %d], al\n", s->stack_offset);
         else if (size == 4) fprintf(cg->out, "    mov [rbp - %d], eax\n", s->stack_offset);
         else fprintf(cg->out, "    mov [rbp - %d], rax\n", s->stack_offset);
+    } else if (node->type == AST_ARRAY_ASSIGN) {
+        gen_expression(cg, node->data.array_assign.value);
+        gen_expression(cg, node->data.array_assign.index);
+        fprintf(cg->out, "    pop rbx ; index\n");
+        fprintf(cg->out, "    pop rax ; value\n");
+        
+        Symbol *s = symtab_lookup(cg->tab, node->data.array_assign.name);
+        int element_size = 8;
+        if (s->type == TYPE_INT8 || s->type == TYPE_UINT8) element_size = 1;
+        else if (s->type == TYPE_INT32 || s->type == TYPE_UINT32) element_size = 4;
+        
+        fprintf(cg->out, "    imul rbx, %d\n", element_size);
+        fprintf(cg->out, "    mov rcx, rbp\n");
+        fprintf(cg->out, "    sub rcx, %d ; base\n", s->stack_offset);
+        
+        if (element_size == 1) fprintf(cg->out, "    mov [rcx + rbx], al\n");
+        else if (element_size == 4) fprintf(cg->out, "    mov [rcx + rbx], eax\n");
+        else fprintf(cg->out, "    mov [rcx + rbx], rax\n");
     } else if (node->type == AST_PRINT) {
         gen_expression(cg, node->data.print_expr);
         fprintf(cg->out, "    pop rdi\n");
