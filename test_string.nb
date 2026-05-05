@@ -1,0 +1,3 @@
+string s = "Hello, Newby!";
+print(s);
+print("Another string");
