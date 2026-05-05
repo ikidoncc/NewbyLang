@@ -95,6 +95,18 @@ ASTNode *ast_new_func_decl(char *name, Type return_type) {
     return node;
 }
 
+ASTNode *ast_new_extern_decl(char *name, Type return_type) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_EXTERN_DECL;
+    node->data.func_decl.name = strdup(name);
+    node->data.func_decl.return_type = return_type;
+    node->data.func_decl.param_count = 0;
+    node->data.func_decl.body = NULL;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
 ASTNode *ast_new_func_call(char *name) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_FUNC_CALL;

@@ -114,6 +114,8 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         fprintf(cg->out, "    leave\n    ret\n");
         fprintf(cg->out, "L%d:\n", over_label);
         cg->tab = old_tab; cg->stack_pos = old_stack;
+    } else if (node->type == AST_EXTERN_DECL) {
+        fprintf(cg->out, "extern %s\n", node->data.func_decl.name);
     } else if (node->type == AST_RETURN) {
         gen_expression(cg, node->data.ret.expr);
         fprintf(cg->out, "    pop rax\n    leave\n    ret\n");

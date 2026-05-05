@@ -96,6 +96,13 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
         }
 
+        case AST_EXTERN_DECL: {
+            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 0, 0);
+            Symbol *s = symtab_lookup(tab, node->data.func_decl.name);
+            s->is_array = 2; // Function
+            break;
+        }
+
         case AST_FUNC_CALL: {
             Symbol *s = symtab_lookup(tab, node->data.func_call.name);
             if (!s || s->is_array != 2) {

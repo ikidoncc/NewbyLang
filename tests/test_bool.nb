@@ -1,8 +1,0 @@
-bool a = true;
-bool b = false;
-print(a);
-print(b);
-print(a && b);
-print(a || b);
-print(10 > 5);
-print(10 < 5);

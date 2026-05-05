@@ -85,9 +85,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    sprintf(cmd, "ld %s -o %s", obj_filename, base_name);
+    sprintf(cmd, "gcc %s -o %s -no-pie -nostartfiles -lc", obj_filename, base_name);
     if (system(cmd) != 0) {
-        fprintf(stderr, "Error during linking (ld)\n");
+        fprintf(stderr, "Error during linking (gcc)\n");
         return 1;
     }
 

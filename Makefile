@@ -14,4 +14,4 @@ run: $(TARGET)
 	./hello
 
 clean:
-	rm -f $(OBJ) $(TARGET) hello output.asm output.o output tests/*.asm tests/*.o tests/hello tests/test_*
+	rm -f $(OBJ) $(TARGET) hello output.asm output.o output tests/*.asm tests/*.o tests/hello tests/test_array tests/test_bool tests/test_ffi tests/test_func tests/test_string tests/test_while tests/test_array_mini tests/test_types

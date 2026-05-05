@@ -1,0 +1,9 @@
+extern func puts(string s);
+
+puts("Ola via FFI com libc!");
+
+func soma(int a, int b) {
+    return a + b;
+}
+
+print(soma(5, 5));

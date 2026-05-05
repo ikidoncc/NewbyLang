@@ -17,6 +17,7 @@ typedef enum {
     TOKEN_ELSE,
     TOKEN_WHILE,
     TOKEN_FUNC,
+    TOKEN_EXTERN,
     TOKEN_RETURN,
     TOKEN_MATCH,
     TOKEN_CASE,

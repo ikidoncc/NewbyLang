@@ -9,6 +9,7 @@ typedef enum {
     AST_ASSIGN,
     AST_ARRAY_ASSIGN,
     AST_FUNC_DECL,
+    AST_EXTERN_DECL,
     AST_FUNC_CALL,
     AST_RETURN,
     AST_BIN_OP,
@@ -64,6 +65,7 @@ ASTNode *ast_new_array_access(char *name, ASTNode *index);
 ASTNode *ast_new_assign(char *name, ASTNode *value);
 ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value);
 ASTNode *ast_new_func_decl(char *name, Type return_type);
+ASTNode *ast_new_extern_decl(char *name, Type return_type);
 ASTNode *ast_new_func_call(char *name);
 ASTNode *ast_new_return(ASTNode *expr);
 ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right);

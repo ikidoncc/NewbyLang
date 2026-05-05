@@ -270,6 +270,27 @@ static ASTNode *parse_statement(Parser *p) {
         node->data.func_decl.body = body;
         ast_set_loc(node, t.line, t.col);
         return node;
+    } else if (t.type == TOKEN_EXTERN) {
+        eat(p, TOKEN_EXTERN);
+        eat(p, TOKEN_FUNC);
+        char *name = strdup(p->current_token.value);
+        eat(p, TOKEN_ID);
+        ASTNode *node = ast_new_extern_decl(name, TYPE_INT);
+        eat(p, TOKEN_LPAREN);
+        while (p->current_token.type != TOKEN_RPAREN) {
+            Type p_type = TYPE_INT;
+            if (p->current_token.type == TOKEN_INT) eat(p, TOKEN_INT);
+            else if (p->current_token.type == TOKEN_BOOL) { eat(p, TOKEN_BOOL); p_type = TYPE_BOOL; }
+            else if (p->current_token.type == TOKEN_STRING) { eat(p, TOKEN_STRING); p_type = TYPE_STRING; }
+            char *p_name = strdup(p->current_token.value);
+            eat(p, TOKEN_ID);
+            ast_func_add_param(node, p_type, p_name);
+            if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
+        }
+        eat(p, TOKEN_RPAREN);
+        eat(p, TOKEN_SEMICOLON);
+        ast_set_loc(node, t.line, t.col);
+        return node;
     } else if (t.type == TOKEN_RETURN) {
         eat(p, TOKEN_RETURN);
         ASTNode *expr = parse_expression(p);
