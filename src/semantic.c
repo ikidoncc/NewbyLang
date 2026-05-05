@@ -150,6 +150,7 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_PRINT:
             semantic_analyze(node->data.print_expr, tab);
+            node->eval_type = node->data.print_expr->eval_type;
             break;
 
         case AST_IF:
