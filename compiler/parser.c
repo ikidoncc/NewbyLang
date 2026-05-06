@@ -73,6 +73,9 @@ static ASTNode *parse_atom(Parser *p) {
         Type type = parse_type(p, &s_name);
         eat(p, TOKEN_RPAREN);
         n = ast_new_sizeof(type, s_name);
+    } else if (t.type == TOKEN_SELF) {
+        eat(p, TOKEN_SELF);
+        n = ast_new_self();
     } else if (t.type == TOKEN_ID) {
         char *name = strdup(t.value);
         eat(p, TOKEN_ID);
@@ -116,12 +119,14 @@ static ASTNode *parse_postfix(Parser *p) {
                 char mangled[512];
                 if (n->type == AST_VARIABLE) sprintf(mangled, "%s_%s", n->data.var_name, member);
                 else sprintf(mangled, "unknown_%s", member);
-                n = ast_new_func_call(mangled);
+                ASTNode *call = ast_new_func_call(mangled);
+                call->data.func_call.obj = n;
                 while (p->current_token.type != TOKEN_RPAREN) {
-                    ast_call_add_arg(n, parse_expression(p));
+                    ast_call_add_arg(call, parse_expression(p));
                     if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
                 }
                 eat(p, TOKEN_RPAREN);
+                n = call;
             } else {
                 n = ast_new_member_access(n, member);
             }
@@ -243,12 +248,17 @@ static ASTNode *parse_statement(Parser *p) {
             eat(p, TOKEN_LBRACE);
             ASTNode *node = ast_new_struct_def(name);
             while (p->current_token.type != TOKEN_RBRACE) {
-                char *s_name = NULL;
-                Type m_type = parse_type(p, &s_name);
-                char *m_name = strdup(p->current_token.value);
-                eat(p, TOKEN_ID);
-                eat(p, TOKEN_SEMICOLON);
-                ast_struct_add_member(node, m_type, m_name);
+                if (p->current_token.type == TOKEN_FUNC) {
+                    ASTNode *method = parse_statement(p);
+                    ast_struct_add_method(node, method);
+                } else {
+                    char *s_name = NULL;
+                    Type m_type = parse_type(p, &s_name);
+                    char *m_name = strdup(p->current_token.value);
+                    eat(p, TOKEN_ID);
+                    eat(p, TOKEN_SEMICOLON);
+                    ast_struct_add_member(node, m_type, m_name);
+                }
             }
             eat(p, TOKEN_RBRACE);
             eat(p, TOKEN_SEMICOLON);
@@ -437,7 +447,7 @@ static ASTNode *parse_statement(Parser *p) {
         ASTNode *node = ast_new_return(expr);
         ast_set_loc(node, t.line, t.col);
         return node;
-    } else if (t.type == TOKEN_LPAREN || t.type == TOKEN_STAR || t.type == TOKEN_AMPERSAND) {
+    } else if (t.type == TOKEN_LPAREN || t.type == TOKEN_STAR || t.type == TOKEN_AMPERSAND || t.type == TOKEN_SELF) {
         ASTNode *expr = parse_expression(p);
         if (p->current_token.type == TOKEN_ASSIGN) {
             eat(p, TOKEN_ASSIGN);
@@ -480,16 +490,30 @@ handle_id_stmt:;
             eat(p, TOKEN_DOT);
             char *member = strdup(p->current_token.value);
             eat(p, TOKEN_ID);
-            eat(p, TOKEN_ASSIGN);
-            ASTNode *val = parse_expression(p);
-            eat(p, TOKEN_SEMICOLON);
-            ASTNode *node = malloc(sizeof(ASTNode));
-            node->type = AST_MEMBER_ASSIGN;
-            node->data.member_assign.obj = ast_new_variable(name);
-            node->data.member_assign.member = member;
-            node->data.member_assign.value = val;
-            ast_set_loc(node, t.line, t.col);
-            return node;
+            if (p->current_token.type == TOKEN_LPAREN) {
+                eat(p, TOKEN_LPAREN);
+                ASTNode *node = ast_new_func_call(member);
+                node->data.func_call.obj = ast_new_variable(name);
+                while (p->current_token.type != TOKEN_RPAREN) {
+                    ast_call_add_arg(node, parse_expression(p));
+                    if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
+                }
+                eat(p, TOKEN_RPAREN);
+                eat(p, TOKEN_SEMICOLON);
+                ast_set_loc(node, t.line, t.col);
+                return node;
+            } else {
+                eat(p, TOKEN_ASSIGN);
+                ASTNode *val = parse_expression(p);
+                eat(p, TOKEN_SEMICOLON);
+                ASTNode *node = malloc(sizeof(ASTNode));
+                node->type = AST_MEMBER_ASSIGN;
+                node->data.member_assign.obj = ast_new_variable(name);
+                node->data.member_assign.member = member;
+                node->data.member_assign.value = val;
+                ast_set_loc(node, t.line, t.col);
+                return node;
+            }
         } else if (p->current_token.type == TOKEN_ASSIGN) {
             eat(p, TOKEN_ASSIGN);
             ASTNode *val = parse_expression(p);

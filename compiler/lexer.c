@@ -89,6 +89,7 @@ Token lexer_next_token(Lexer *lexer) {
         else if (strcmp(val, "pub") == 0) t = create_token(TOKEN_PUB, NULL, start_line, start_col);
         else if (strcmp(val, "struct") == 0) t = create_token(TOKEN_STRUCT, NULL, start_line, start_col);
         else if (strcmp(val, "sizeof") == 0) t = create_token(TOKEN_SIZEOF, NULL, start_line, start_col);
+        else if (strcmp(val, "self") == 0) t = create_token(TOKEN_SELF, NULL, start_line, start_col);
         else if (strcmp(val, "return") == 0) t = create_token(TOKEN_RETURN, NULL, start_line, start_col);
         else if (strcmp(val, "match") == 0) t = create_token(TOKEN_MATCH, NULL, start_line, start_col);
         else if (strcmp(val, "case") == 0) t = create_token(TOKEN_CASE, NULL, start_line, start_col);
@@ -116,7 +117,7 @@ Token lexer_next_token(Lexer *lexer) {
         return create_token(TOKEN_STRING_LIT, val, start_line, start_col);
     }
 
-    char next = lexer->src[lexer->pos + 1];
+    char next = (lexer->src[lexer->pos] != '\0') ? lexer->src[lexer->pos + 1] : '\0';
     lexer->pos++;
     lexer->col++;
     switch (c) {

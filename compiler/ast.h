@@ -19,6 +19,8 @@ typedef enum {
     AST_FUNC_CALL,
     AST_NS_ACCESS,
     AST_MEMBER_ACCESS,
+    AST_METHOD_CALL,
+    AST_SELF,
     AST_RETURN,
     AST_ADDR_OF,
     AST_DEREF,
@@ -49,9 +51,9 @@ typedef struct ASTNode {
         struct { char *name; struct ASTNode *index; struct ASTNode *value; } array_assign;
         struct { struct ASTNode *ptr; struct ASTNode *value; } deref_assign;
         struct { struct ASTNode *obj; char *member; struct ASTNode *value; } member_assign;
-        struct { char *name; Type return_type; struct { Type type; char *name; } params[8]; int param_count; struct ASTNode *body; int is_pub; } func_decl;
-        struct { char *name; struct ASTNode *args[8]; int arg_count; } func_call;
-        struct { char *name; struct { Type type; char *name; } members[16]; int member_count; } struct_def;
+        struct { char *name; Type return_type; struct { Type type; char *name; } params[8]; int param_count; struct ASTNode *body; int is_pub; char *parent_struct; } func_decl;
+        struct { char *name; struct ASTNode *args[8]; int arg_count; struct ASTNode *obj; } func_call;
+        struct { char *name; struct { Type type; char *name; } members[16]; int member_count; struct ASTNode *methods[16]; int method_count; } struct_def;
         struct { struct ASTNode *ptr; char *member; } member_access;
         struct { Type type; char *struct_name; } size_of;
         struct { char *module; char *name; } ns_access;
@@ -87,7 +89,9 @@ ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value);
 ASTNode *ast_new_func_decl(char *name, Type return_type);
 ASTNode *ast_new_extern_decl(char *name, Type return_type);
 ASTNode *ast_new_struct_def(char *name);
+void ast_struct_add_method(ASTNode *s, ASTNode *method);
 ASTNode *ast_new_sizeof(Type type, char *struct_name);
+ASTNode *ast_new_self();
 ASTNode *ast_new_import(char *module);
 ASTNode *ast_new_ns_access(char *module, char *name);
 ASTNode *ast_new_member_access(ASTNode *ptr, char *member);

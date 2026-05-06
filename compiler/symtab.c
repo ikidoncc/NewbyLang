@@ -10,7 +10,7 @@ SymbolTable *symtab_new(SymbolTable *parent) {
     return tab;
 }
 
-void symtab_add(SymbolTable *tab, char *name, int offset, Type type, int is_array, int array_size) {
+void symtab_add(SymbolTable *tab, char *name, int offset, Type type, int is_array, int array_size, const char *struct_name) {
     tab->count++;
     tab->symbols = realloc(tab->symbols, sizeof(Symbol) * tab->count);
     tab->symbols[tab->count - 1].name = strdup(name);
@@ -18,6 +18,7 @@ void symtab_add(SymbolTable *tab, char *name, int offset, Type type, int is_arra
     tab->symbols[tab->count - 1].type = type;
     tab->symbols[tab->count - 1].is_array = is_array;
     tab->symbols[tab->count - 1].array_size = array_size;
+    tab->symbols[tab->count - 1].struct_name = struct_name ? strdup(struct_name) : NULL;
 }
 
 Symbol *symtab_lookup(SymbolTable *tab, char *name) {

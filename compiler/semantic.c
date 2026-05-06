@@ -18,11 +18,14 @@ static StructDef global_structs[16];
 static int global_struct_count = 0;
 
 static StructDef *find_struct_def(const char *name) {
+    if (!name) return NULL;
     for (int i = 0; i < global_struct_count; i++) {
         if (strcmp(global_structs[i].name, name) == 0) return &global_structs[i];
     }
     return NULL;
 }
+
+static char *current_struct = NULL;
 
 void semantic_analyze(ASTNode *node, SymbolTable *tab) {
     if (!node) return;
@@ -44,36 +47,31 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
                 sd->members[i].name = strdup(node->data.struct_def.members[i].name);
                 sd->members[i].type = node->data.struct_def.members[i].type;
             }
+            char *old_struct = current_struct;
+            current_struct = sd->name;
+            for (int i = 0; i < node->data.struct_def.method_count; i++) {
+                semantic_analyze(node->data.struct_def.methods[i], tab);
+            }
+            current_struct = old_struct;
             break;
         }
 
         case AST_VAR_DECL:
             if (node->data.var_decl.value) semantic_analyze(node->data.var_decl.value, tab);
-            symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type, 0, 0);
-            if (node->data.var_decl.struct_name) {
-                Symbol *s = symtab_lookup(tab, node->data.var_decl.name);
-                // Tag symbol as struct instance somehow. I'll use is_array=3
-                s->is_array = 3; 
-                // Store struct name in name? No, I need a better way.
-                // For now, I'll assume name is enough.
-            }
+            symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type, 0, 0, node->data.var_decl.struct_name);
             break;
 
         case AST_ARRAY_DECL:
-            symtab_add(tab, node->data.array_decl.name, 0, node->data.array_decl.type, 1, node->data.array_decl.size);
+            symtab_add(tab, node->data.array_decl.name, 0, node->data.array_decl.type, 1, node->data.array_decl.size, NULL);
             break;
 
         case AST_ASSIGN: {
-            Symbol *s = symtab_lookup(tab, node->data.assign.name);
-            if (!s) { exit(1); }
             semantic_analyze(node->data.assign.value, tab);
             break;
         }
 
         case AST_MEMBER_ACCESS: {
             semantic_analyze(node->data.member_access.ptr, tab);
-            // We need to know which struct this is.
-            // Simplified: if ptr is AST_VARIABLE, look up its struct type.
             node->eval_type = TYPE_INT;
             break;
         }
@@ -84,85 +82,74 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
 
         case AST_FUNC_DECL: {
-            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 0, 0);
-            Symbol *s = symtab_lookup(tab, node->data.func_decl.name);
-            s->is_array = 2;
+            if (node->data.func_decl.parent_struct) {
+                char mangled[512];
+                sprintf(mangled, "%s_%s", node->data.func_decl.parent_struct, node->data.func_decl.name);
+                node->data.func_decl.name = strdup(mangled);
+            }
+            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 2, 0, NULL);
             SymbolTable *func_tab = symtab_new(tab);
+            char *old_struct = current_struct;
+            if (node->data.func_decl.parent_struct) {
+                current_struct = node->data.func_decl.parent_struct;
+                symtab_add(func_tab, "self", 0, TYPE_PTR, 0, 0, current_struct);
+            }
             for (int i = 0; i < node->data.func_decl.param_count; i++) {
-                symtab_add(func_tab, node->data.func_decl.params[i].name, 0, node->data.func_decl.params[i].type, 0, 0);
+                symtab_add(func_tab, node->data.func_decl.params[i].name, 0, node->data.func_decl.params[i].type, 0, 0, NULL);
             }
             semantic_analyze(node->data.func_decl.body, func_tab);
+            current_struct = old_struct;
             break;
         }
 
         case AST_EXTERN_DECL: {
-            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 0, 0);
-            Symbol *s = symtab_lookup(tab, node->data.func_decl.name);
-            s->is_array = 2;
+            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 2, 0, NULL);
             break;
         }
 
-        case AST_IMPORT: break;
-
-        case AST_NS_ACCESS: {
-            char mangled[256];
-            sprintf(mangled, "%s_%s", node->data.ns_access.module, node->data.ns_access.name);
-            Symbol *s = symtab_lookup(tab, mangled);
-            if (s) node->eval_type = s->type;
-            else node->eval_type = TYPE_INT;
+        case AST_SELF:
+            node->eval_type = TYPE_PTR;
             break;
-        }
 
         case AST_FUNC_CALL: {
-            Symbol *s = symtab_lookup(tab, node->data.func_call.name);
-            for (int i = 0; i < node->data.func_call.arg_count; i++) {
-                semantic_analyze(node->data.func_call.args[i], tab);
+            if (node->data.func_call.obj) {
+                semantic_analyze(node->data.func_call.obj, tab);
+                char *s_name = NULL;
+                if (node->data.func_call.obj->type == AST_VARIABLE) {
+                    Symbol *s = symtab_lookup(tab, node->data.func_call.obj->data.var_name);
+                    if (s) s_name = s->struct_name;
+                } else if (node->data.func_call.obj->type == AST_SELF) {
+                    s_name = current_struct;
+                }
+                if (s_name) {
+                    char mangled[512];
+                    sprintf(mangled, "%s_%s", s_name, node->data.func_call.name);
+                    node->data.func_call.name = strdup(mangled);
+                }
             }
+            for (int i = 0; i < node->data.func_call.arg_count; i++) {
+                if (node->data.func_call.args[i]) semantic_analyze(node->data.func_call.args[i], tab);
+            }
+            Symbol *s = symtab_lookup(tab, node->data.func_call.name);
             if (s) node->eval_type = s->type;
             else node->eval_type = TYPE_INT;
             break;
         }
 
         case AST_SYSCALL:
-            for (int i = 0; i < node->data.syscall.arg_count; i++) {
-                semantic_analyze(node->data.syscall.args[i], tab);
-            }
+            for (int i = 0; i < node->data.syscall.arg_count; i++) semantic_analyze(node->data.syscall.args[i], tab);
             node->eval_type = TYPE_INT;
             break;
 
-        case AST_SIZEOF: {
-            int size = 8;
-            if (node->data.size_of.struct_name) {
-                StructDef *sd = find_struct_def(node->data.size_of.struct_name);
-                if (sd) size = sd->member_count * 8;
-            }
-            // We'll store the calculated size in eval_type? No, let's store it in a new field or just use a hack.
-            // I'll add 'calculated_size' to ASTNode if I can, or just use 'number' in codegen.
-            // Actually, I'll just make codegen do the calculation since I have find_struct_def logic there too.
-            node->eval_type = TYPE_INT;
-            break;
-        }
-
-        case AST_ADDR_OF:
-            semantic_analyze(node->data.addr_of.expr, tab);
-            node->eval_type = TYPE_PTR;
-            break;
-
-        case AST_DEREF:
-            semantic_analyze(node->data.deref.expr, tab);
-            node->eval_type = TYPE_INT;
-            break;
-
-        case AST_RETURN:
-            semantic_analyze(node->data.ret.expr, tab);
-            break;
+        case AST_SIZEOF: node->eval_type = TYPE_INT; break;
+        case AST_ADDR_OF: semantic_analyze(node->data.addr_of.expr, tab); node->eval_type = TYPE_PTR; break;
+        case AST_DEREF: semantic_analyze(node->data.deref.expr, tab); node->eval_type = TYPE_INT; break;
+        case AST_RETURN: semantic_analyze(node->data.ret.expr, tab); break;
 
         case AST_BIN_OP: {
             semantic_analyze(node->data.bin_op.left, tab);
             semantic_analyze(node->data.bin_op.right, tab);
-            Type left_t = node->data.bin_op.left->eval_type;
-            if (is_pointer(left_t)) node->eval_type = TYPE_PTR;
-            else node->eval_type = left_t;
+            if (node->data.bin_op.left) node->eval_type = node->data.bin_op.left->eval_type;
             break;
         }
 
@@ -182,7 +169,7 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_PRINT:
             semantic_analyze(node->data.print_expr, tab);
-            node->eval_type = node->data.print_expr->eval_type;
+            node->eval_type = node->data.print_expr ? node->data.print_expr->eval_type : TYPE_INT;
             break;
 
         case AST_IF:
@@ -198,9 +185,7 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_MATCH:
             semantic_analyze(node->data.match.expr, tab);
-            for (int i = 0; i < node->data.match.case_count; i++) {
-                semantic_analyze(node->data.match.cases[i]->data.match_case.stmt, tab);
-            }
+            for (int i = 0; i < node->data.match.case_count; i++) semantic_analyze(node->data.match.cases[i]->data.match_case.stmt, tab);
             if (node->data.match.default_case) semantic_analyze(node->data.match.default_case, tab);
             break;
 

@@ -1,0 +1,23 @@
+struct Point {
+    int x;
+    int y;
+
+    func move(int dx, int dy) {
+        self.x = self.x + dx;
+        self.y = self.y + dy;
+        return 0;
+    }
+
+    func show() {
+        print(self.x);
+        print(self.y);
+        return 0;
+    }
+};
+
+struct Point p;
+p.x = 10;
+p.y = 20;
+
+p.move(5, 5);
+p.show();

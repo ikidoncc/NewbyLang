@@ -9,6 +9,7 @@ typedef struct {
     Type type;
     int is_array;
     int array_size;
+    char *struct_name;
 } Symbol;
 
 typedef struct SymbolTable {
@@ -18,7 +19,7 @@ typedef struct SymbolTable {
 } SymbolTable;
 
 SymbolTable *symtab_new(SymbolTable *parent);
-void symtab_add(SymbolTable *tab, char *name, int offset, Type type, int is_array, int array_size);
+void symtab_add(SymbolTable *tab, char *name, int offset, Type type, int is_array, int array_size, const char *struct_name);
 Symbol *symtab_lookup(SymbolTable *tab, char *name);
 
 #endif
