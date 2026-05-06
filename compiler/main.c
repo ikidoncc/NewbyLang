@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "lexer.h"
 #include "parser.h"
 #include "semantic.h"
@@ -15,6 +16,13 @@ void add_link_object(const char *name) {
         if (strcmp(link_objects[i], name) == 0) return;
     }
     link_objects[link_object_count++] = strdup(name);
+}
+
+int needs_recompile(const char *src_path, const char *obj_path) {
+    struct stat src_stat, obj_stat;
+    if (stat(obj_path, &obj_stat) != 0) return 1;
+    if (stat(src_path, &src_stat) != 0) return 0;
+    return src_stat.st_mtime > obj_stat.st_mtime;
 }
 
 char *find_module_path(const char *filename) {
@@ -54,14 +62,14 @@ ASTNode *compile_file(const char *filename) {
     return root;
 }
 
-void process_imports(ASTNode *root, int is_root) {
+void process_imports(ASTNode *root, const char *compiler_path) {
     int initial_count = root->data.program.count;
     for (int i = 0; i < initial_count; i++) {
         ASTNode *n = root->data.program.nodes[i];
         if (n->type == AST_IMPORT) {
             char *mod_name = n->data.import.module_name;
-            ASTNode *imp = compile_file(mod_name);
-            if (!imp) {
+            char *found_path = find_module_path(mod_name);
+            if (!found_path) {
                 fprintf(stderr, "Error: Could not find module '%s'\n", mod_name);
                 exit(1);
             }
@@ -74,19 +82,24 @@ void process_imports(ASTNode *root, int is_root) {
             semantic_add_module(final_mod);
 
             char obj_path[512];
-            char *found_path = find_module_path(mod_name);
             strncpy(obj_path, found_path, 511);
             char *dot_obj = strrchr(obj_path, '.');
             if (dot_obj) strcpy(dot_obj, ".o");
             else strcat(obj_path, ".o");
             
-            if (access(obj_path, F_OK) != 0) {
+            if (needs_recompile(found_path, obj_path)) {
                 char compile_cmd[1024];
-                sprintf(compile_cmd, "./nbc -c %s", found_path);
+                sprintf(compile_cmd, "%s -c %s", compiler_path, found_path);
                 if (system(compile_cmd) != 0) {
                     fprintf(stderr, "Error: Failed to auto-compile module '%s'\n", found_path);
                     exit(1);
                 }
+            }
+            
+            ASTNode *imp = compile_file(found_path);
+            if (!imp) {
+                fprintf(stderr, "Error: Could not parse module '%s'\n", found_path);
+                exit(1);
             }
             free(found_path);
             add_link_object(obj_path);
@@ -127,7 +140,7 @@ int main(int argc, char **argv) {
     char *dot_ptr = strrchr(base_name, '.');
     if (dot_ptr) *dot_ptr = '\0';
 
-    process_imports(root, 1);
+    process_imports(root, argv[0]);
 
     SymbolTable *sem_tab = symtab_new(NULL);
     semantic_analyze(root, sem_tab);
