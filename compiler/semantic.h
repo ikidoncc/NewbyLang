@@ -5,5 +5,6 @@
 #include "symtab.h"
 
 void semantic_analyze(ASTNode *node, SymbolTable *tab);
+void semantic_add_module(const char *name);
 
 #endif

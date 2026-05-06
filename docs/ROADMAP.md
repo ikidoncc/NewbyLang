@@ -91,12 +91,12 @@ Este documento define as funcionalidades essenciais do **Newby** antes da estabi
 
 ---
 
-# 8. ⚙️ Pipeline de Compilação Modular (CRÍTICO)
+## 🔥 Pipeline de Compilação Modular (CRÍTICO)
 
 ## 🔥 Compilação modular
 - [x] geração de `.o` sem `_start`
 - [x] separação entre módulos compiláveis
-- [ ] linking final automatizado de múltiplos objetos -- **ALTA PRIORIDADE**
+- [x] linking final automatizado de múltiplos objetos (Intelligent Linker)
 
 ## 🔥 Organização de bibliotecas
 - [x] busca automática em `library/`

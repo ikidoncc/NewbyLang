@@ -3,11 +3,6 @@
 #include <string.h>
 #include "semantic.h"
 
-static int is_integer_type(Type t) {
-    return t == TYPE_INT || t == TYPE_INT8 || t == TYPE_INT32 || 
-           t == TYPE_UINT || t == TYPE_UINT8 || t == TYPE_UINT32;
-}
-
 typedef struct StructDef {
     char *name;
     struct { char *name; Type type; } members[16];
@@ -26,12 +21,19 @@ static int global_struct_count = 0;
 static EnumDef global_enums[16];
 static int global_enum_count = 0;
 
-static StructDef *find_struct_def(const char *name) {
-    if (!name) return NULL;
-    for (int i = 0; i < global_struct_count; i++) {
-        if (strcmp(global_structs[i].name, name) == 0) return &global_structs[i];
+static char *global_modules[32];
+static int global_module_count = 0;
+
+void semantic_add_module(const char *name) {
+    global_modules[global_module_count++] = strdup(name);
+}
+
+static int is_module(const char *name) {
+    if (!name) return 0;
+    for (int i = 0; i < global_module_count; i++) {
+        if (strcmp(global_modules[i], name) == 0) return 1;
     }
-    return NULL;
+    return 0;
 }
 
 static EnumDef *find_enum_def(const char *name) {
@@ -99,13 +101,11 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_MEMBER_ACCESS: {
             semantic_analyze(node->data.member_access.ptr, tab);
-            // Check if it's an enum access: Enum.Variant
             if (node->data.member_access.ptr->type == AST_VARIABLE) {
                 EnumDef *ed = find_enum_def(node->data.member_access.ptr->data.var_name);
                 if (ed) {
                     for (int i = 0; i < ed->variant_count; i++) {
                         if (strcmp(ed->variants[i], node->data.member_access.member) == 0) {
-                            // Resolve to integer constant
                             node->type = AST_NUMBER;
                             node->data.number = i;
                             node->eval_type = TYPE_INT;
@@ -155,17 +155,29 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_FUNC_CALL: {
             if (node->data.func_call.obj) {
-                semantic_analyze(node->data.func_call.obj, tab);
                 char *s_name = NULL;
                 if (node->data.func_call.obj->type == AST_VARIABLE) {
-                    Symbol *s = symtab_lookup(tab, node->data.func_call.obj->data.var_name);
-                    if (s) s_name = s->struct_name;
+                    char *name = node->data.func_call.obj->data.var_name;
+                    if (is_module(name)) {
+                        char mangled[512];
+                        sprintf(mangled, "%s_%s", name, node->data.func_call.name);
+                        free(node->data.func_call.name);
+                        node->data.func_call.name = strdup(mangled);
+                        node->data.func_call.obj = NULL;
+                    } else {
+                        semantic_analyze(node->data.func_call.obj, tab);
+                        Symbol *s = symtab_lookup(tab, name);
+                        if (s) s_name = s->struct_name;
+                    }
                 } else if (node->data.func_call.obj->type == AST_SELF) {
+                    semantic_analyze(node->data.func_call.obj, tab);
                     s_name = current_struct;
                 }
-                if (s_name) {
+                
+                if (s_name && node->data.func_call.obj) {
                     char mangled[512];
                     sprintf(mangled, "%s_%s", s_name, node->data.func_call.name);
+                    free(node->data.func_call.name);
                     node->data.func_call.name = strdup(mangled);
                 }
             }
@@ -230,8 +242,6 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             for (int i = 0; i < node->data.match.case_count; i++) {
                 ASTNode *c = node->data.match.cases[i];
                 semantic_analyze(c->data.match_case.val_node, tab);
-                // If val_node is a constant (number or enum variant resolved to number),
-                // copy its value to c->data.match_case.val
                 if (c->data.match_case.val_node->type == AST_NUMBER) {
                     c->data.match_case.val = c->data.match_case.val_node->data.number;
                 }

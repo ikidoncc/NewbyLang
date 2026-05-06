@@ -205,8 +205,10 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
     } else if (node->type == AST_FUNC_DECL) {
         int over_label = new_label();
         fprintf(cg->out, "    jmp L%d\n", over_label);
-        if (node->data.func_decl.is_pub) fprintf(cg->out, "%s_%s:\n", cg->module_name, node->data.func_decl.name);
-        else fprintf(cg->out, "%s:\n", node->data.func_decl.name);
+        if (node->data.func_decl.is_pub) {
+            fprintf(cg->out, "global %s_%s\n", cg->module_name, node->data.func_decl.name);
+            fprintf(cg->out, "%s_%s:\n", cg->module_name, node->data.func_decl.name);
+        } else fprintf(cg->out, "%s:\n", node->data.func_decl.name);
         fprintf(cg->out, "    push rbp\n    mov rbp, rsp\n    sub rsp, 1024\n");
         SymbolTable *old_tab = cg->tab;
         cg->tab = symtab_new(old_tab);

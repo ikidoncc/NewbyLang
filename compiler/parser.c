@@ -116,10 +116,7 @@ static ASTNode *parse_postfix(Parser *p) {
             eat(p, TOKEN_ID);
             if (p->current_token.type == TOKEN_LPAREN) {
                 eat(p, TOKEN_LPAREN);
-                char mangled[512];
-                if (n->type == AST_VARIABLE) sprintf(mangled, "%s_%s", n->data.var_name, member);
-                else sprintf(mangled, "unknown_%s", member);
-                ASTNode *call = ast_new_func_call(mangled);
+                ASTNode *call = ast_new_func_call(member);
                 call->data.func_call.obj = n;
                 while (p->current_token.type != TOKEN_RPAREN) {
                     ast_call_add_arg(call, parse_expression(p));
@@ -530,9 +527,7 @@ handle_id_stmt:;
             eat(p, TOKEN_ID);
             if (p->current_token.type == TOKEN_LPAREN) {
                 eat(p, TOKEN_LPAREN);
-                char mangled[512];
-                sprintf(mangled, "%s_%s", name, member);
-                ASTNode *node = ast_new_func_call(mangled);
+                ASTNode *node = ast_new_func_call(member);
                 node->data.func_call.obj = ast_new_variable(name);
                 while (p->current_token.type != TOKEN_RPAREN) {
                     ast_call_add_arg(node, parse_expression(p));
