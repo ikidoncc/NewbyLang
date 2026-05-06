@@ -9,12 +9,15 @@ typedef enum {
     AST_ASSIGN,
     AST_ARRAY_ASSIGN,
     AST_DEREF_ASSIGN,
+    AST_MEMBER_ASSIGN,
     AST_FUNC_DECL,
     AST_EXTERN_DECL,
     AST_IMPORT,
+    AST_STRUCT_DEF,
     AST_SYSCALL,
     AST_FUNC_CALL,
     AST_NS_ACCESS,
+    AST_MEMBER_ACCESS,
     AST_RETURN,
     AST_ADDR_OF,
     AST_DEREF,
@@ -39,13 +42,16 @@ typedef struct ASTNode {
     int line;
     int col;
     union {
-        struct { Type type; char *name; struct ASTNode *value; int is_pub; } var_decl;
+        struct { Type type; char *name; struct ASTNode *value; int is_pub; char *struct_name; } var_decl;
         struct { Type type; char *name; int size; int is_pub; } array_decl;
         struct { char *name; struct ASTNode *value; } assign;
         struct { char *name; struct ASTNode *index; struct ASTNode *value; } array_assign;
         struct { struct ASTNode *ptr; struct ASTNode *value; } deref_assign;
+        struct { struct ASTNode *obj; char *member; struct ASTNode *value; } member_assign;
         struct { char *name; Type return_type; struct { Type type; char *name; } params[8]; int param_count; struct ASTNode *body; int is_pub; } func_decl;
         struct { char *name; struct ASTNode *args[8]; int arg_count; } func_call;
+        struct { char *name; struct { Type type; char *name; } members[16]; int member_count; } struct_def;
+        struct { struct ASTNode *ptr; char *member; } member_access;
         struct { char *module; char *name; } ns_access;
         struct { char *module_name; } import;
         struct { struct ASTNode *args[7]; int arg_count; } syscall;
@@ -78,8 +84,10 @@ ASTNode *ast_new_assign(char *name, ASTNode *value);
 ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value);
 ASTNode *ast_new_func_decl(char *name, Type return_type);
 ASTNode *ast_new_extern_decl(char *name, Type return_type);
+ASTNode *ast_new_struct_def(char *name);
 ASTNode *ast_new_import(char *module);
 ASTNode *ast_new_ns_access(char *module, char *name);
+ASTNode *ast_new_member_access(ASTNode *ptr, char *member);
 ASTNode *ast_new_func_call(char *name);
 ASTNode *ast_new_syscall();
 ASTNode *ast_new_return(ASTNode *expr);
@@ -96,6 +104,7 @@ ASTNode *ast_new_match(ASTNode *expr);
 void ast_func_add_param(ASTNode *func, Type type, char *name);
 void ast_call_add_arg(ASTNode *call, ASTNode *arg);
 void ast_syscall_add_arg(ASTNode *syscall, ASTNode *arg);
+void ast_struct_add_member(ASTNode *s, Type type, char *name);
 void ast_match_add_case(ASTNode *match, int val, ASTNode *stmt);
 void ast_match_set_default(ASTNode *match, ASTNode *stmt);
 void ast_program_add(ASTNode *program, ASTNode *node);

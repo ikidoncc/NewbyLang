@@ -55,7 +55,6 @@ static ASTNode *parse_primary(Parser *p) {
             char *member = strdup(p->current_token.value);
             eat(p, TOKEN_ID);
             if (p->current_token.type == TOKEN_LPAREN) {
-                // It's a function call via namespace: Module.func(...)
                 eat(p, TOKEN_LPAREN);
                 char mangled[512];
                 sprintf(mangled, "%s_%s", name, member);
@@ -66,7 +65,7 @@ static ASTNode *parse_primary(Parser *p) {
                 }
                 eat(p, TOKEN_RPAREN);
             } else {
-                n = ast_new_ns_access(name, member);
+                n = ast_new_member_access(ast_new_variable(name), member);
             }
         } else if (p->current_token.type == TOKEN_LPAREN) {
             eat(p, TOKEN_LPAREN);
@@ -190,26 +189,71 @@ static ASTNode *parse_statement(Parser *p) {
         ASTNode *node = ast_new_import(mod);
         ast_set_loc(node, t.line, t.col);
         return node;
+    } else if (t.type == TOKEN_STRUCT) {
+        eat(p, TOKEN_STRUCT);
+        char *name = strdup(p->current_token.value);
+        eat(p, TOKEN_ID);
+        if (p->current_token.type == TOKEN_LBRACE) {
+            // Struct definition
+            eat(p, TOKEN_LBRACE);
+            ASTNode *node = ast_new_struct_def(name);
+            while (p->current_token.type != TOKEN_RBRACE) {
+                Type m_type = TYPE_INT;
+                if (p->current_token.type == TOKEN_INT) { eat(p, TOKEN_INT); m_type = TYPE_INT; }
+                else if (p->current_token.type == TOKEN_BOOL) { eat(p, TOKEN_BOOL); m_type = TYPE_BOOL; }
+                else if (p->current_token.type == TOKEN_STRING) { eat(p, TOKEN_STRING); m_type = TYPE_STRING; }
+                char *m_name = strdup(p->current_token.value);
+                eat(p, TOKEN_ID);
+                eat(p, TOKEN_SEMICOLON);
+                ast_struct_add_member(node, m_type, m_name);
+            }
+            eat(p, TOKEN_RBRACE);
+            eat(p, TOKEN_SEMICOLON);
+            ast_set_loc(node, t.line, t.col);
+            return node;
+        } else {
+            // Struct variable declaration: struct Point p;
+            char *var_name = strdup(p->current_token.value);
+            eat(p, TOKEN_ID);
+            eat(p, TOKEN_SEMICOLON);
+            ASTNode *node = ast_new_var_decl(TYPE_UNKNOWN, var_name, NULL);
+            node->data.var_decl.struct_name = name;
+            ast_set_loc(node, t.line, t.col);
+            return node;
+        }
     } else if (t.type == TOKEN_INT || t.type == TOKEN_BOOL ||
         t.type == TOKEN_FLOAT || t.type == TOKEN_STRING ||
         t.type == TOKEN_INT8 || t.type == TOKEN_INT32 ||
         t.type == TOKEN_UINT || t.type == TOKEN_UINT8 ||
-        t.type == TOKEN_UINT32) {
+        t.type == TOKEN_UINT32 || t.type == TOKEN_ID) {
         
-        Type type;
-        switch (t.type) {
-            case TOKEN_INT: type = TYPE_INT; break;
-            case TOKEN_BOOL: type = TYPE_BOOL; break;
-            case TOKEN_FLOAT: type = TYPE_FLOAT; break;
-            case TOKEN_STRING: type = TYPE_STRING; break;
-            case TOKEN_INT8: type = TYPE_INT8; break;
-            case TOKEN_INT32: type = TYPE_INT32; break;
-            case TOKEN_UINT: type = TYPE_UINT; break;
-            case TOKEN_UINT8: type = TYPE_UINT8; break;
-            case TOKEN_UINT32: type = TYPE_UINT32; break;
-            default: type = TYPE_UNKNOWN; break;
+        Type type = TYPE_INT;
+        char *struct_name = NULL;
+        if (t.type == TOKEN_ID) {
+            Token next = lexer_peek(p->lexer);
+            if (next.type == TOKEN_ID || next.type == TOKEN_STAR) {
+                struct_name = strdup(t.value);
+                type = TYPE_UNKNOWN;
+                eat(p, TOKEN_ID);
+            } else {
+                goto handle_id_stmt;
+            }
+        } else {
+            switch (t.type) {
+                case TOKEN_INT: type = TYPE_INT; break;
+                case TOKEN_BOOL: type = TYPE_BOOL; break;
+                case TOKEN_FLOAT: type = TYPE_FLOAT; break;
+                case TOKEN_STRING: type = TYPE_STRING; break;
+                case TOKEN_INT8: type = TYPE_INT8; break;
+                case TOKEN_INT32: type = TYPE_INT32; break;
+                case TOKEN_UINT: type = TYPE_UINT; break;
+                case TOKEN_UINT8: type = TYPE_UINT8; break;
+                case TOKEN_UINT32: type = TYPE_UINT32; break;
+                default: type = TYPE_UNKNOWN; break;
+            }
+            eat(p, t.type);
         }
-        eat(p, t.type);
+
         if (p->current_token.type == TOKEN_STAR) {
             eat(p, TOKEN_STAR);
             type = TYPE_PTR;
@@ -227,11 +271,15 @@ static ASTNode *parse_statement(Parser *p) {
             ast_set_loc(node, t.line, t.col);
             return node;
         } else {
-            eat(p, TOKEN_ASSIGN);
-            ASTNode *val = parse_expression(p);
+            ASTNode *val = NULL;
+            if (p->current_token.type == TOKEN_ASSIGN) {
+                eat(p, TOKEN_ASSIGN);
+                val = parse_expression(p);
+            }
             eat(p, TOKEN_SEMICOLON);
             ASTNode *node = ast_new_var_decl(type, name, val);
             node->data.var_decl.is_pub = is_pub;
+            node->data.var_decl.struct_name = struct_name;
             ast_set_loc(node, t.line, t.col);
             return node;
         }
@@ -361,6 +409,7 @@ static ASTNode *parse_statement(Parser *p) {
         ast_set_loc(node, t.line, t.col);
         return node;
     } else if (t.type == TOKEN_ID) {
+handle_id_stmt:;
         char *name = strdup(t.value);
         eat(p, TOKEN_ID);
         if (p->current_token.type == TOKEN_LBRACKET) {
@@ -371,6 +420,20 @@ static ASTNode *parse_statement(Parser *p) {
             ASTNode *val = parse_expression(p);
             eat(p, TOKEN_SEMICOLON);
             ASTNode *node = ast_new_array_assign(name, index, val);
+            ast_set_loc(node, t.line, t.col);
+            return node;
+        } else if (p->current_token.type == TOKEN_DOT) {
+            eat(p, TOKEN_DOT);
+            char *member = strdup(p->current_token.value);
+            eat(p, TOKEN_ID);
+            eat(p, TOKEN_ASSIGN);
+            ASTNode *val = parse_expression(p);
+            eat(p, TOKEN_SEMICOLON);
+            ASTNode *node = malloc(sizeof(ASTNode));
+            node->type = AST_MEMBER_ASSIGN;
+            node->data.member_assign.obj = ast_new_variable(name);
+            node->data.member_assign.member = member;
+            node->data.member_assign.value = val;
             ast_set_loc(node, t.line, t.col);
             return node;
         } else if (p->current_token.type == TOKEN_ASSIGN) {
@@ -393,7 +456,7 @@ static ASTNode *parse_statement(Parser *p) {
             return node;
         }
     }
-    fprintf(stderr, "Syntax Error [%d:%d]: Unexpected token %d\n", t.line, t.col, t.type);
+    fprintf(stderr, "Syntax Error [%d:%d]: Unexpected token %d ('%s')\n", t.line, t.col, t.type, t.value ? t.value : "");
     exit(1);
 }
 

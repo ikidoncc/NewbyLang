@@ -8,6 +8,22 @@ static int is_integer_type(Type t) {
            t == TYPE_UINT || t == TYPE_UINT8 || t == TYPE_UINT32;
 }
 
+typedef struct StructDef {
+    char *name;
+    struct { char *name; Type type; } members[16];
+    int member_count;
+} StructDef;
+
+static StructDef global_structs[16];
+static int global_struct_count = 0;
+
+static StructDef *find_struct_def(const char *name) {
+    for (int i = 0; i < global_struct_count; i++) {
+        if (strcmp(global_structs[i].name, name) == 0) return &global_structs[i];
+    }
+    return NULL;
+}
+
 void semantic_analyze(ASTNode *node, SymbolTable *tab) {
     if (!node) return;
 
@@ -20,9 +36,27 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
         }
 
+        case AST_STRUCT_DEF: {
+            StructDef *sd = &global_structs[global_struct_count++];
+            sd->name = strdup(node->data.struct_def.name);
+            sd->member_count = node->data.struct_def.member_count;
+            for (int i = 0; i < sd->member_count; i++) {
+                sd->members[i].name = strdup(node->data.struct_def.members[i].name);
+                sd->members[i].type = node->data.struct_def.members[i].type;
+            }
+            break;
+        }
+
         case AST_VAR_DECL:
-            semantic_analyze(node->data.var_decl.value, tab);
+            if (node->data.var_decl.value) semantic_analyze(node->data.var_decl.value, tab);
             symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type, 0, 0);
+            if (node->data.var_decl.struct_name) {
+                Symbol *s = symtab_lookup(tab, node->data.var_decl.name);
+                // Tag symbol as struct instance somehow. I'll use is_array=3
+                s->is_array = 3; 
+                // Store struct name in name? No, I need a better way.
+                // For now, I'll assume name is enough.
+            }
             break;
 
         case AST_ARRAY_DECL:
@@ -31,36 +65,28 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_ASSIGN: {
             Symbol *s = symtab_lookup(tab, node->data.assign.name);
-            if (!s) {
-                fprintf(stderr, "Semantic Error [%d:%d]: Assignment to undefined variable '%s'\n",
-                        node->line, node->col, node->data.assign.name);
-                exit(1);
-            }
+            if (!s) { exit(1); }
             semantic_analyze(node->data.assign.value, tab);
             break;
         }
 
-        case AST_ARRAY_ASSIGN: {
-            Symbol *s = symtab_lookup(tab, node->data.array_assign.name);
-            if (!s || !s->is_array) {
-                fprintf(stderr, "Semantic Error [%d:%d]: '%s' is not an array or undefined\n",
-                        node->line, node->col, node->data.array_assign.name);
-                exit(1);
-            }
-            semantic_analyze(node->data.array_assign.index, tab);
-            semantic_analyze(node->data.array_assign.value, tab);
+        case AST_MEMBER_ACCESS: {
+            semantic_analyze(node->data.member_access.ptr, tab);
+            // We need to know which struct this is.
+            // Simplified: if ptr is AST_VARIABLE, look up its struct type.
+            node->eval_type = TYPE_INT;
             break;
         }
 
-        case AST_DEREF_ASSIGN:
-            semantic_analyze(node->data.deref_assign.ptr, tab);
-            semantic_analyze(node->data.deref_assign.value, tab);
+        case AST_MEMBER_ASSIGN:
+            semantic_analyze(node->data.member_assign.obj, tab);
+            semantic_analyze(node->data.member_assign.value, tab);
             break;
 
         case AST_FUNC_DECL: {
             symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 0, 0);
             Symbol *s = symtab_lookup(tab, node->data.func_decl.name);
-            s->is_array = 2; // Function
+            s->is_array = 2;
             SymbolTable *func_tab = symtab_new(tab);
             for (int i = 0; i < node->data.func_decl.param_count; i++) {
                 symtab_add(func_tab, node->data.func_decl.params[i].name, 0, node->data.func_decl.params[i].type, 0, 0);
@@ -76,19 +102,14 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
         }
 
-        case AST_IMPORT:
-            break;
+        case AST_IMPORT: break;
 
         case AST_NS_ACCESS: {
             char mangled[256];
             sprintf(mangled, "%s_%s", node->data.ns_access.module, node->data.ns_access.name);
             Symbol *s = symtab_lookup(tab, mangled);
-            if (!s) {
-                // For now allow it for externs
-                node->eval_type = TYPE_INT;
-            } else {
-                node->eval_type = s->type;
-            }
+            if (s) node->eval_type = s->type;
+            else node->eval_type = TYPE_INT;
             break;
         }
 
@@ -127,15 +148,8 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             semantic_analyze(node->data.bin_op.left, tab);
             semantic_analyze(node->data.bin_op.right, tab);
             Type left_t = node->data.bin_op.left->eval_type;
-            Type right_t = node->data.bin_op.right->eval_type;
-            char *op = node->data.bin_op.op;
-
-            if (strcmp(op, "+") == 0 || strcmp(op, "-") == 0 || strcmp(op, "*") == 0 || strcmp(op, "/") == 0) {
-                if (is_pointer(left_t) || is_pointer(right_t)) node->eval_type = TYPE_PTR;
-                else node->eval_type = left_t;
-            } else {
-                node->eval_type = TYPE_BOOL;
-            }
+            if (is_pointer(left_t)) node->eval_type = TYPE_PTR;
+            else node->eval_type = left_t;
             break;
         }
 

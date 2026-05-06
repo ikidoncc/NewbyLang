@@ -108,6 +108,16 @@ ASTNode *ast_new_extern_decl(char *name, Type return_type) {
     return node;
 }
 
+ASTNode *ast_new_struct_def(char *name) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_STRUCT_DEF;
+    node->data.struct_def.name = strdup(name);
+    node->data.struct_def.member_count = 0;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
 ASTNode *ast_new_import(char *module) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_IMPORT;
@@ -122,6 +132,16 @@ ASTNode *ast_new_ns_access(char *module, char *name) {
     node->type = AST_NS_ACCESS;
     node->data.ns_access.module = strdup(module);
     node->data.ns_access.name = strdup(name);
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_member_access(ASTNode *ptr, char *member) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_MEMBER_ACCESS;
+    node->data.member_access.ptr = ptr;
+    node->data.member_access.member = strdup(member);
     node->eval_type = TYPE_UNKNOWN;
     ast_set_loc(node, 0, 0);
     return node;
@@ -189,6 +209,12 @@ void ast_syscall_add_arg(ASTNode *syscall, ASTNode *arg) {
     syscall->data.syscall.args[i] = arg;
 }
 
+void ast_struct_add_member(ASTNode *s, Type type, char *name) {
+    int i = s->data.struct_def.member_count++;
+    s->data.struct_def.members[i].type = type;
+    s->data.struct_def.members[i].name = strdup(name);
+}
+
 ASTNode *ast_new_bin_op(char *op, ASTNode *left, ASTNode *right) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_BIN_OP;
@@ -207,6 +233,7 @@ ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value) {
     node->data.var_decl.name = strdup(name);
     node->data.var_decl.value = value;
     node->data.var_decl.is_pub = 0;
+    node->data.var_decl.struct_name = NULL;
     node->eval_type = TYPE_UNKNOWN;
     ast_set_loc(node, 0, 0);
     return node;

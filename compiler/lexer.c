@@ -87,6 +87,7 @@ Token lexer_next_token(Lexer *lexer) {
         else if (strcmp(val, "syscall") == 0) t = create_token(TOKEN_SYSCALL, NULL, start_line, start_col);
         else if (strcmp(val, "import") == 0) t = create_token(TOKEN_IMPORT, NULL, start_line, start_col);
         else if (strcmp(val, "pub") == 0) t = create_token(TOKEN_PUB, NULL, start_line, start_col);
+        else if (strcmp(val, "struct") == 0) t = create_token(TOKEN_STRUCT, NULL, start_line, start_col);
         else if (strcmp(val, "return") == 0) t = create_token(TOKEN_RETURN, NULL, start_line, start_col);
         else if (strcmp(val, "match") == 0) t = create_token(TOKEN_MATCH, NULL, start_line, start_col);
         else if (strcmp(val, "case") == 0) t = create_token(TOKEN_CASE, NULL, start_line, start_col);
@@ -148,4 +149,15 @@ Token lexer_next_token(Lexer *lexer) {
         case '}': return create_token(TOKEN_RBRACE, NULL, start_line, start_col);
         default: return create_token(TOKEN_UNKNOWN, NULL, start_line, start_col);
     }
+}
+
+Token lexer_peek(Lexer *lexer) {
+    int old_pos = lexer->pos;
+    int old_line = lexer->line;
+    int old_col = lexer->col;
+    Token t = lexer_next_token(lexer);
+    lexer->pos = old_pos;
+    lexer->line = old_line;
+    lexer->col = old_col;
+    return t;
 }

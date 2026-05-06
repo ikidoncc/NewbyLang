@@ -21,6 +21,7 @@ typedef enum {
     TOKEN_SYSCALL,
     TOKEN_IMPORT,
     TOKEN_PUB,
+    TOKEN_STRUCT,
     TOKEN_RETURN,
     TOKEN_MATCH,
     TOKEN_CASE,
@@ -72,6 +73,7 @@ typedef struct {
 
 Lexer *lexer_new(const char *src);
 Token lexer_next_token(Lexer *lexer);
+Token lexer_peek(Lexer *lexer);
 void token_free(Token token);
 
 #endif
