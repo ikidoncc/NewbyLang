@@ -42,6 +42,9 @@ static void gen_lvalue(Codegen *cg, ASTNode *node) {
         Symbol *s = symtab_lookup(cg->tab, node->data.var_name);
         fprintf(cg->out, "    lea rax, [rbp - %d]\n", s->stack_offset);
         fprintf(cg->out, "    push rax\n");
+    } else if (node->type == AST_DEREF) {
+        // The address of *p is the value of p
+        gen_expression(cg, node->data.deref.expr);
     } else if (node->type == AST_ARRAY_ACCESS) {
         Symbol *s = symtab_lookup(cg->tab, node->data.array_access.name);
         gen_expression(cg, node->data.array_access.index);
@@ -111,6 +114,14 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
         for (int i = 0; i < node->data.syscall.arg_count; i++) gen_expression(cg, node->data.syscall.args[i]);
         for (int i = node->data.syscall.arg_count - 1; i >= 0; i--) fprintf(cg->out, "    pop %s\n", reg_syscall[i]);
         fprintf(cg->out, "    syscall\n    push rax\n");
+    } else if (node->type == AST_SIZEOF) {
+        int size = 8;
+        if (node->data.size_of.struct_name) {
+            StructMeta *s = find_struct(cg, node->data.size_of.struct_name);
+            if (s) size = s->size;
+        }
+        fprintf(cg->out, "    mov rax, %d\n", size);
+        fprintf(cg->out, "    push rax\n");
     } else if (node->type == AST_ADDR_OF) {
         gen_lvalue(cg, node->data.addr_of.expr);
     } else if (node->type == AST_DEREF) {

@@ -1,0 +1,17 @@
+extern func malloc(int size) : int*;
+extern func free(int* ptr);
+
+struct Data {
+    int a;
+    int b;
+};
+
+int* p = malloc(sizeof(struct Data));
+if (p != 0) {
+    *p = 500;
+    print(*p);
+    free(p);
+}
+
+print(sizeof(int));
+print(sizeof(struct Data));

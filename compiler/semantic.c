@@ -130,6 +130,19 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             node->eval_type = TYPE_INT;
             break;
 
+        case AST_SIZEOF: {
+            int size = 8;
+            if (node->data.size_of.struct_name) {
+                StructDef *sd = find_struct_def(node->data.size_of.struct_name);
+                if (sd) size = sd->member_count * 8;
+            }
+            // We'll store the calculated size in eval_type? No, let's store it in a new field or just use a hack.
+            // I'll add 'calculated_size' to ASTNode if I can, or just use 'number' in codegen.
+            // Actually, I'll just make codegen do the calculation since I have find_struct_def logic there too.
+            node->eval_type = TYPE_INT;
+            break;
+        }
+
         case AST_ADDR_OF:
             semantic_analyze(node->data.addr_of.expr, tab);
             node->eval_type = TYPE_PTR;

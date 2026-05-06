@@ -14,7 +14,7 @@ Permitir que a linguagem interaja com o sistema operacional e bibliotecas C exis
 Necessário para manipular estruturas de dados complexas usadas em I/O e rede.
 - [x] **Ponteiros (`*T`)**: Capacidade de referenciar e manipular endereços de memória diretamente.
 - [x] **Estruturas (`struct`)**: Definição de tipos de dados compostos.
-- [ ] **Alocação Dinâmica**: Implementação de `malloc` e `free` via runtime ou FFI com a `libc`.
+- [x] **Alocação Dinâmica**: Implementação de `malloc` e `free` via runtime ou FFI com a `libc`.
 
 ## 3. Modularidade e Organização
 Evitar conflitos de nomes e permitir a reutilização de código entre arquivos.

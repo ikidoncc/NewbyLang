@@ -15,6 +15,7 @@ typedef enum {
     AST_IMPORT,
     AST_STRUCT_DEF,
     AST_SYSCALL,
+    AST_SIZEOF,
     AST_FUNC_CALL,
     AST_NS_ACCESS,
     AST_MEMBER_ACCESS,
@@ -52,6 +53,7 @@ typedef struct ASTNode {
         struct { char *name; struct ASTNode *args[8]; int arg_count; } func_call;
         struct { char *name; struct { Type type; char *name; } members[16]; int member_count; } struct_def;
         struct { struct ASTNode *ptr; char *member; } member_access;
+        struct { Type type; char *struct_name; } size_of;
         struct { char *module; char *name; } ns_access;
         struct { char *module_name; } import;
         struct { struct ASTNode *args[7]; int arg_count; } syscall;
@@ -85,6 +87,7 @@ ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value);
 ASTNode *ast_new_func_decl(char *name, Type return_type);
 ASTNode *ast_new_extern_decl(char *name, Type return_type);
 ASTNode *ast_new_struct_def(char *name);
+ASTNode *ast_new_sizeof(Type type, char *struct_name);
 ASTNode *ast_new_import(char *module);
 ASTNode *ast_new_ns_access(char *module, char *name);
 ASTNode *ast_new_member_access(ASTNode *ptr, char *member);

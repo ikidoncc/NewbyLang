@@ -118,6 +118,16 @@ ASTNode *ast_new_struct_def(char *name) {
     return node;
 }
 
+ASTNode *ast_new_sizeof(Type type, char *struct_name) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_SIZEOF;
+    node->data.size_of.type = type;
+    node->data.size_of.struct_name = struct_name ? strdup(struct_name) : NULL;
+    node->eval_type = TYPE_INT;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
 ASTNode *ast_new_import(char *module) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_IMPORT;

@@ -1,0 +1,13 @@
+extern func malloc(int size) : int*;
+extern func free(int* ptr);
+
+struct Node {
+    int value;
+};
+
+int* p = malloc(sizeof(struct Node));
+if (p != 0) {
+    (*p).value = 777;
+    print((*p).value);
+    free(p);
+}
