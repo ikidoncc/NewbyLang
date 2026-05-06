@@ -94,7 +94,7 @@ void process_imports(ASTNode *root, int is_root) {
                     sprintf(mangled, "%s_%s", final_mod, in->data.func_decl.name);
                     ASTNode *ext = ast_new_extern_decl(mangled, in->data.func_decl.return_type);
                     for (int k = 0; k < in->data.func_decl.param_count; k++) {
-                        ast_func_add_param(ext, in->data.func_decl.params[k].type, in->data.func_decl.params[k].name);
+                        ast_func_add_param(ext, in->data.func_decl.params[k].type, in->data.func_decl.params[k].name, in->data.func_decl.params[k].struct_name);
                     }
                     ast_program_add(root, ext);
                 }
@@ -145,7 +145,6 @@ int main(int argc, char **argv) {
     char cmd[2048];
     sprintf(cmd, "nasm -f elf64 %s -o %s", asm_filename, obj_filename);
     if (system(cmd) != 0) return 1;
-    remove(asm_filename);
 
     if (!compile_only) {
         char link_cmd[4096];

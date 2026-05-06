@@ -125,14 +125,22 @@ ASTNode *ast_new_enum_def(char *name) {
     node->type = AST_ENUM_DEF;
     node->data.enum_def.name = strdup(name);
     node->data.enum_def.variant_count = 0;
+    node->data.enum_def.generic_count = 0;
     node->eval_type = TYPE_UNKNOWN;
     ast_set_loc(node, 0, 0);
     return node;
 }
 
-void ast_enum_add_variant(ASTNode *e, char *name) {
+void ast_enum_add_variant(ASTNode *e, char *name, Type type, char *struct_name) {
     int i = e->data.enum_def.variant_count++;
-    e->data.enum_def.variants[i] = strdup(name);
+    e->data.enum_def.variants[i].name = strdup(name);
+    e->data.enum_def.variants[i].type = type;
+    e->data.enum_def.variants[i].struct_name = struct_name ? strdup(struct_name) : NULL;
+}
+
+void ast_enum_add_generic(ASTNode *e, char *name) {
+    int i = e->data.enum_def.generic_count++;
+    e->data.enum_def.generic_params[i] = strdup(name);
 }
 
 ASTNode *ast_new_sizeof(Type type, char *struct_name) {
@@ -221,10 +229,11 @@ ASTNode *ast_new_deref(ASTNode *expr) {
     return node;
 }
 
-void ast_func_add_param(ASTNode *func, Type type, char *name) {
+void ast_func_add_param(ASTNode *func, Type type, char *name, char *struct_name) {
     int i = func->data.func_decl.param_count++;
     func->data.func_decl.params[i].type = type;
     func->data.func_decl.params[i].name = strdup(name);
+    func->data.func_decl.params[i].struct_name = struct_name ? strdup(struct_name) : NULL;
 }
 
 void ast_call_add_arg(ASTNode *call, ASTNode *arg) {
@@ -346,12 +355,13 @@ ASTNode *ast_new_match(ASTNode *expr) {
     return node;
 }
 
-void ast_match_add_case(ASTNode *match, ASTNode *val_node, ASTNode *stmt) {
+void ast_match_add_case(ASTNode *match, ASTNode *val_node, char *capture_var, ASTNode *stmt) {
     match->data.match.case_count++;
     match->data.match.cases = realloc(match->data.match.cases, sizeof(ASTNode*) * match->data.match.case_count);
     ASTNode *c = malloc(sizeof(ASTNode));
     c->type = AST_CASE;
     c->data.match_case.val_node = val_node;
+    c->data.match_case.capture_var = capture_var ? strdup(capture_var) : NULL;
     c->data.match_case.val = 0;
     c->data.match_case.stmt = stmt;
     match->data.match.cases[match->data.match.case_count - 1] = c;

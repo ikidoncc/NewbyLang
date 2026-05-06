@@ -7,7 +7,7 @@ typedef struct {
     char *name;
     int stack_offset;
     Type type;
-    int is_array;
+    int is_array; // 0: var, 1: array, 2: func, 3: struct instance, 4: enum instance
     int array_size;
     char *struct_name;
 } Symbol;

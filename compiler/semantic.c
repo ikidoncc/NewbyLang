@@ -11,8 +11,11 @@ typedef struct StructDef {
 
 typedef struct EnumDef {
     char *name;
-    char *variants[16];
+    struct { char *name; Type type; char *struct_name; } variants[16];
     int variant_count;
+    char *generic_params[4];
+    int generic_count;
+    ASTNode *template_node;
 } EnumDef;
 
 static StructDef global_structs[16];
@@ -45,6 +48,10 @@ static EnumDef *find_enum_def(const char *name) {
 }
 
 static char *current_struct = NULL;
+
+int semantic_is_enum(const char *name) {
+    return find_enum_def(name) != NULL;
+}
 
 void semantic_analyze(ASTNode *node, SymbolTable *tab) {
     if (!node) return;
@@ -79,15 +86,31 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             EnumDef *ed = &global_enums[global_enum_count++];
             ed->name = strdup(node->data.enum_def.name);
             ed->variant_count = node->data.enum_def.variant_count;
+            ed->generic_count = node->data.enum_def.generic_count;
             for (int i = 0; i < ed->variant_count; i++) {
-                ed->variants[i] = strdup(node->data.enum_def.variants[i]);
+                ed->variants[i].name = strdup(node->data.enum_def.variants[i].name);
+                ed->variants[i].type = node->data.enum_def.variants[i].type;
+                ed->variants[i].struct_name = node->data.enum_def.variants[i].struct_name ? strdup(node->data.enum_def.variants[i].struct_name) : NULL;
             }
+            for (int i = 0; i < ed->generic_count; i++) {
+                ed->generic_params[i] = strdup(node->data.enum_def.generic_params[i]);
+            }
+            ed->template_node = node;
             break;
         }
 
         case AST_VAR_DECL:
             if (node->data.var_decl.value) semantic_analyze(node->data.var_decl.value, tab);
             symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type, 0, 0, node->data.var_decl.struct_name);
+            if (node->data.var_decl.struct_name) {
+                if (semantic_is_enum(node->data.var_decl.struct_name)) {
+                    Symbol *s = symtab_lookup(tab, node->data.var_decl.name);
+                    s->is_array = 4;
+                } else {
+                    Symbol *s = symtab_lookup(tab, node->data.var_decl.name);
+                    s->is_array = 3;
+                }
+            }
             break;
 
         case AST_ARRAY_DECL:
@@ -105,9 +128,9 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
                 EnumDef *ed = find_enum_def(node->data.member_access.ptr->data.var_name);
                 if (ed) {
                     for (int i = 0; i < ed->variant_count; i++) {
-                        if (strcmp(ed->variants[i], node->data.member_access.member) == 0) {
-                            node->type = AST_NUMBER;
-                            node->data.number = i;
+                        if (strcmp(ed->variants[i].name, node->data.member_access.member) == 0) {
+                            // Don't change type to AST_NUMBER here to avoid corruption,
+                            // but mark eval_type and store info if needed.
                             node->eval_type = TYPE_INT;
                             return;
                         }
@@ -137,7 +160,11 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
                 symtab_add(func_tab, "self", 0, TYPE_PTR, 0, 0, current_struct);
             }
             for (int i = 0; i < node->data.func_decl.param_count; i++) {
-                symtab_add(func_tab, node->data.func_decl.params[i].name, 0, node->data.func_decl.params[i].type, 0, 0, NULL);
+                int is_enum = 0;
+                if (node->data.func_decl.params[i].struct_name) {
+                    if (semantic_is_enum(node->data.func_decl.params[i].struct_name)) is_enum = 4;
+                }
+                symtab_add(func_tab, node->data.func_decl.params[i].name, 0, node->data.func_decl.params[i].type, is_enum, 0, node->data.func_decl.params[i].struct_name);
             }
             semantic_analyze(node->data.func_decl.body, func_tab);
             current_struct = old_struct;
@@ -158,6 +185,21 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
                 char *s_name = NULL;
                 if (node->data.func_call.obj->type == AST_VARIABLE) {
                     char *name = node->data.func_call.obj->data.var_name;
+                    EnumDef *ed = find_enum_def(name);
+                    if (ed) {
+                        for (int i = 0; i < ed->variant_count; i++) {
+                            if (strcmp(ed->variants[i].name, node->data.func_call.name) == 0) {
+                                node->type = AST_METHOD_CALL;
+                                node->data.number = i;
+                                if (node->data.func_call.arg_count > 0) {
+                                    semantic_analyze(node->data.func_call.args[0], tab);
+                                }
+                                node->eval_type = TYPE_INT;
+                                return;
+                            }
+                        }
+                    }
+
                     if (is_module(name)) {
                         char mangled[512];
                         sprintf(mangled, "%s_%s", name, node->data.func_call.name);
@@ -241,11 +283,39 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             semantic_analyze(node->data.match.expr, tab);
             for (int i = 0; i < node->data.match.case_count; i++) {
                 ASTNode *c = node->data.match.cases[i];
-                semantic_analyze(c->data.match_case.val_node, tab);
-                if (c->data.match_case.val_node->type == AST_NUMBER) {
-                    c->data.match_case.val = c->data.match_case.val_node->data.number;
+                ASTNode *vn = c->data.match_case.val_node;
+                Type var_type = TYPE_INT;
+                char *var_struct = NULL;
+                
+                if (vn->type == AST_NUMBER) {
+                    c->data.match_case.val = vn->data.number;
+                } else if (vn->type == AST_VARIABLE) {
+                    // Simple variable match? No, must be Enum variant.
+                    // But if it's just 'case Val:', it might be a variable.
+                    // Simplified: for now only handle member access for enums.
+                } else if (vn->type == AST_MEMBER_ACCESS) {
+                    ASTNode *ptr = vn->data.member_access.ptr;
+                    char *member = vn->data.member_access.member;
+                    if (ptr->type == AST_VARIABLE) {
+                        EnumDef *ed = find_enum_def(ptr->data.var_name);
+                        if (ed) {
+                            for (int k = 0; k < ed->variant_count; k++) {
+                                if (strcmp(ed->variants[k].name, member) == 0) {
+                                    c->data.match_case.val = k;
+                                    var_type = ed->variants[k].type;
+                                    var_struct = ed->variants[k].struct_name;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                 }
-                semantic_analyze(c->data.match_case.stmt, tab);
+                
+                SymbolTable *case_tab = symtab_new(tab);
+                if (c->data.match_case.capture_var) {
+                    symtab_add(case_tab, c->data.match_case.capture_var, 0, var_type, 0, 0, var_struct);
+                }
+                semantic_analyze(c->data.match_case.stmt, case_tab);
             }
             if (node->data.match.default_case) semantic_analyze(node->data.match.default_case, tab);
             break;

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "codegen.h"
+#include "semantic.h"
 
 Codegen *codegen_new(FILE *out, const char *module_name) {
     Codegen *cg = malloc(sizeof(Codegen));
@@ -50,7 +51,7 @@ static void gen_lvalue(Codegen *cg, ASTNode *node) {
         gen_expression(cg, node->data.array_access.index);
         fprintf(cg->out, "    pop rbx\n    imul rbx, 8\n    mov rcx, rbp\n    sub rcx, %d\n    add rcx, rbx\n    push rcx\n", s->stack_offset);
     } else if (node->type == AST_MEMBER_ACCESS) {
-        gen_lvalue(cg, node->data.member_access.ptr);
+        gen_lvalue(cg, node);
         fprintf(cg->out, "    pop rax\n");
         int offset = 0;
         for(int i=0; i<cg->struct_count; i++) {
@@ -87,8 +88,15 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
     } else if (node->type == AST_VARIABLE) {
         Symbol *s = symtab_lookup(cg->tab, node->data.var_name);
         if (!s) { fprintf(stderr, "Undefined variable: %s\n", node->data.var_name); exit(1); }
-        fprintf(cg->out, "    mov rax, [rbp - %d]\n", s->stack_offset);
-        fprintf(cg->out, "    push rax\n");
+        if (s->is_array == 4) {
+            fprintf(cg->out, "    mov rax, [rbp - %d]\n", s->stack_offset + 8);
+            fprintf(cg->out, "    push rax\n");
+            fprintf(cg->out, "    mov rax, [rbp - %d]\n", s->stack_offset);
+            fprintf(cg->out, "    push rax\n");
+        } else {
+            fprintf(cg->out, "    mov rax, [rbp - %d]\n", s->stack_offset);
+            fprintf(cg->out, "    push rax\n");
+        }
     } else if (node->type == AST_SELF) {
         Symbol *s = symtab_lookup(cg->tab, "self");
         if (s) {
@@ -114,10 +122,29 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
             start_idx = 1;
         }
         for (int i = 0; i < node->data.func_call.arg_count; i++) gen_expression(cg, node->data.func_call.args[i]);
-        for (int i = node->data.func_call.arg_count + start_idx - 1; i >= 0; i--) {
+        
+        int total_words = start_idx;
+        for (int i = 0; i < node->data.func_call.arg_count; i++) {
+            ASTNode *arg = node->data.func_call.args[i];
+            if (arg->type == AST_VARIABLE) {
+                Symbol *s = symtab_lookup(cg->tab, arg->data.var_name);
+                if (s && s->is_array == 4) total_words += 2;
+                else total_words += 1;
+            } else if (arg->type == AST_METHOD_CALL) total_words += 2;
+            else total_words += 1;
+        }
+
+        // Pop in increasing order: reg[0] gets top, reg[1] gets next...
+        for (int i = 0; i < total_words; i++) {
             fprintf(cg->out, "    pop %s\n", reg_params[i]);
         }
+
         fprintf(cg->out, "    call %s\n    push rax\n", node->data.func_call.name);
+    } else if (node->type == AST_METHOD_CALL) {
+        if (node->data.func_call.arg_count > 0) gen_expression(cg, node->data.func_call.args[0]);
+        else fprintf(cg->out, "    push 0\n");
+        fprintf(cg->out, "    mov rax, %d\n", node->data.number);
+        fprintf(cg->out, "    push rax\n");
     } else if (node->type == AST_SYSCALL) {
         char *reg_syscall[] = {"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"};
         for (int i = 0; i < node->data.syscall.arg_count; i++) gen_expression(cg, node->data.syscall.args[i]);
@@ -128,6 +155,7 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
         if (node->data.size_of.struct_name) {
             StructMeta *s = find_struct(cg, node->data.size_of.struct_name);
             if (s) size = s->size;
+            if (strchr(node->data.size_of.struct_name, '_') || semantic_is_enum(node->data.size_of.struct_name)) size = 16;
         }
         fprintf(cg->out, "    mov rax, %d\n", size);
         fprintf(cg->out, "    push rax\n");
@@ -201,7 +229,6 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         s->size = current_offset;
         for (int i = 0; i < node->data.struct_def.method_count; i++) codegen_generate(cg, node->data.struct_def.methods[i]);
     } else if (node->type == AST_ENUM_DEF) {
-        // No code generation needed for enum definitions
     } else if (node->type == AST_FUNC_DECL) {
         int over_label = new_label();
         fprintf(cg->out, "    jmp L%d\n", over_label);
@@ -214,16 +241,25 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         cg->tab = symtab_new(old_tab);
         int old_stack = cg->stack_pos; cg->stack_pos = 0;
         char *reg_params[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-        int start_idx = 0;
+        int reg_idx = 0;
         if (node->data.func_decl.parent_struct) {
             cg->stack_pos += 8;
             symtab_add(cg->tab, "self", cg->stack_pos, TYPE_PTR, 0, 0, node->data.func_decl.parent_struct);
-            fprintf(cg->out, "    mov [rbp - %d], %s\n", cg->stack_pos, reg_params[start_idx++]);
+            fprintf(cg->out, "    mov [rbp - %d], %s\n", cg->stack_pos, reg_params[reg_idx++]);
         }
         for (int i = 0; i < node->data.func_decl.param_count; i++) {
-            cg->stack_pos += 8;
-            symtab_add(cg->tab, node->data.func_decl.params[i].name, cg->stack_pos, node->data.func_decl.params[i].type, 0, 0, NULL);
-            fprintf(cg->out, "    mov [rbp - %d], %s\n", cg->stack_pos, reg_params[start_idx++]);
+            if (node->data.func_decl.params[i].struct_name && (strchr(node->data.func_decl.params[i].struct_name, '_') || semantic_is_enum(node->data.func_decl.params[i].struct_name))) {
+                cg->stack_pos += 8;
+                fprintf(cg->out, "    mov [rbp - %d], %s\n", cg->stack_pos, reg_params[reg_idx++]);
+                int tag_offset = cg->stack_pos;
+                cg->stack_pos += 8;
+                fprintf(cg->out, "    mov [rbp - %d], %s\n", cg->stack_pos, reg_params[reg_idx++]);
+                symtab_add(cg->tab, node->data.func_decl.params[i].name, tag_offset, node->data.func_decl.params[i].type, 4, 0, node->data.func_decl.params[i].struct_name);
+            } else {
+                cg->stack_pos += 8;
+                symtab_add(cg->tab, node->data.func_decl.params[i].name, cg->stack_pos, node->data.func_decl.params[i].type, 0, 0, NULL);
+                fprintf(cg->out, "    mov [rbp - %d], %s\n", cg->stack_pos, reg_params[reg_idx++]);
+            }
         }
         codegen_generate(cg, node->data.func_decl.body);
         fprintf(cg->out, "    leave\n    ret\nL%d:\n", over_label);
@@ -239,21 +275,45 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         if (node->data.var_decl.struct_name) {
             StructMeta *s = find_struct(cg, node->data.var_decl.struct_name);
             if (s) size = s->size;
+            if (strchr(node->data.var_decl.struct_name, '_') || semantic_is_enum(node->data.var_decl.struct_name)) size = 16;
         }
         if (node->data.var_decl.value) {
             gen_expression(cg, node->data.var_decl.value);
-            fprintf(cg->out, "    pop rax\n");
+            if (node->data.var_decl.value->type == AST_METHOD_CALL) size = 16;
+            
+            if (size == 8) {
+                fprintf(cg->out, "    pop rax\n");
+                cg->stack_pos += 8;
+                symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos, node->data.var_decl.type, 0, 0, node->data.var_decl.struct_name);
+                fprintf(cg->out, "    mov [rbp - %d], rax\n", cg->stack_pos);
+            } else {
+                fprintf(cg->out, "    pop rax ; tag\n");
+                fprintf(cg->out, "    pop rbx ; data\n");
+                cg->stack_pos += 8;
+                fprintf(cg->out, "    mov [rbp - %d], rax\n", cg->stack_pos);
+                int tag_offset = cg->stack_pos;
+                cg->stack_pos += 8;
+                fprintf(cg->out, "    mov [rbp - %d], rbx\n", cg->stack_pos);
+                symtab_add(cg->tab, node->data.var_decl.name, tag_offset, node->data.var_decl.type, 4, 0, node->data.var_decl.struct_name);
+            }
+        } else {
+            cg->stack_pos += size;
+            symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos, node->data.var_decl.type, (size==16?4:0), 0, node->data.var_decl.struct_name);
         }
-        cg->stack_pos += size;
-        symtab_add(cg->tab, node->data.var_decl.name, cg->stack_pos, node->data.var_decl.type, 0, 0, node->data.var_decl.struct_name);
-        if (node->data.var_decl.value) fprintf(cg->out, "    mov [rbp - %d], rax\n", cg->stack_pos);
     } else if (node->type == AST_ARRAY_DECL) {
         cg->stack_pos += node->data.array_decl.size * 8;
         symtab_add(cg->tab, node->data.array_decl.name, cg->stack_pos, node->data.array_decl.type, 1, node->data.array_decl.size, NULL);
     } else if (node->type == AST_ASSIGN) {
         gen_expression(cg, node->data.assign.value);
         Symbol *s = symtab_lookup(cg->tab, node->data.assign.name);
-        fprintf(cg->out, "    pop rax\n    mov [rbp - %d], rax\n", s->stack_offset);
+        if (s->is_array == 4) {
+            fprintf(cg->out, "    pop rax ; tag\n");
+            fprintf(cg->out, "    pop rbx ; data\n");
+            fprintf(cg->out, "    mov [rbp - %d], rax\n", s->stack_offset);
+            fprintf(cg->out, "    mov [rbp - %d], rbx\n", s->stack_offset + 8);
+        } else {
+            fprintf(cg->out, "    pop rax\n    mov [rbp - %d], rax\n", s->stack_offset);
+        }
     } else if (node->type == AST_MEMBER_ASSIGN) {
         gen_expression(cg, node->data.member_assign.value);
         gen_lvalue(cg, node->data.member_assign.obj);
@@ -296,7 +356,7 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         fprintf(cg->out, "L%d:\n", l2);
     } else if (node->type == AST_WHILE) {
         int l1 = new_label(), l2 = new_label();
-        fprintf(cg->out, "L%d:\n", l1);
+        fprintf(cg->out, ".L%d:\n", l1);
         gen_expression(cg, node->data.while_stmt.condition);
         fprintf(cg->out, "    pop rax\n    test rax, rax\n    jz L%d\n", l2);
         codegen_generate(cg, node->data.while_stmt.body);
@@ -309,13 +369,23 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         fprintf(cg->out, "    pop rax\n");
     } else if (node->type == AST_MATCH) {
         gen_expression(cg, node->data.match.expr);
-        fprintf(cg->out, "    pop rax\n");
+        fprintf(cg->out, "    pop rax ; tag\n");
+        fprintf(cg->out, "    pop rbx ; data\n");
         int end_label = new_label();
         for (int i = 0; i < node->data.match.case_count; i++) {
             int next_case = new_label();
             fprintf(cg->out, "    cmp rax, %d\n", node->data.match.cases[i]->data.match_case.val);
             fprintf(cg->out, "    jne L%d\n", next_case);
+            
+            SymbolTable *old_tab = cg->tab;
+            cg->tab = symtab_new(old_tab);
+            if (node->data.match.cases[i]->data.match_case.capture_var) {
+                cg->stack_pos += 8;
+                symtab_add(cg->tab, node->data.match.cases[i]->data.match_case.capture_var, cg->stack_pos, TYPE_INT, 0, 0, NULL);
+                fprintf(cg->out, "    mov [rbp - %d], rbx\n", cg->stack_pos);
+            }
             codegen_generate(cg, node->data.match.cases[i]->data.match_case.stmt);
+            cg->tab = old_tab;
             fprintf(cg->out, "    jmp L%d\nL%d:\n", end_label, next_case);
         }
         if (node->data.match.default_case) {

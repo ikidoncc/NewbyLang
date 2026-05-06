@@ -7,6 +7,7 @@ Parser *parser_new(Lexer *lexer) {
     Parser *p = malloc(sizeof(Parser));
     p->lexer = lexer;
     p->current_token = lexer_next_token(lexer);
+    p->root = NULL;
     return p;
 }
 
@@ -24,6 +25,56 @@ static void eat(Parser *p, TokenType type) {
 
 static ASTNode *parse_expression(Parser *p);
 
+typedef struct {
+    char *name;
+    ASTNode *node;
+} Template;
+
+static Template global_templates[16];
+static int global_template_count = 0;
+
+static void add_template(char *name, ASTNode *node) {
+    global_templates[global_template_count].name = strdup(name);
+    global_templates[global_template_count].node = node;
+    global_template_count++;
+}
+
+static Template *find_template(const char *name) {
+    for (int i = 0; i < global_template_count; i++) {
+        if (strcmp(global_templates[i].name, name) == 0) return &global_templates[i];
+    }
+    return NULL;
+}
+
+typedef struct {
+    char *name;
+    Type type;
+    char *struct_name;
+} GenericArg;
+
+static void instantiate_enum(Parser *p, Template *t, char *mangled_name, GenericArg *args, int arg_count) {
+    ASTNode *tmpl = t->node;
+    ASTNode *node = ast_new_enum_def(mangled_name);
+    
+    for (int i = 0; i < tmpl->data.enum_def.variant_count; i++) {
+        char *v_name = tmpl->data.enum_def.variants[i].name;
+        Type v_type = tmpl->data.enum_def.variants[i].type;
+        char *v_struct = tmpl->data.enum_def.variants[i].struct_name;
+        
+        if (v_struct) {
+            for (int k = 0; k < tmpl->data.enum_def.generic_count; k++) {
+                if (strcmp(v_struct, tmpl->data.enum_def.generic_params[k]) == 0) {
+                    v_type = args[k].type;
+                    v_struct = args[k].struct_name;
+                    break;
+                }
+            }
+        }
+        ast_enum_add_variant(node, v_name, v_type, v_struct);
+    }
+    ast_program_add(p->root, node);
+}
+
 static Type parse_type(Parser *p, char **struct_name) {
     Token t = p->current_token;
     Type type = TYPE_INT;
@@ -37,8 +88,33 @@ static Type parse_type(Parser *p, char **struct_name) {
         eat(p, TOKEN_ID);
         type = TYPE_UNKNOWN;
     } else if (t.type == TOKEN_ID) {
-        if (struct_name) *struct_name = strdup(t.value);
+        char *name = strdup(t.value);
         eat(p, TOKEN_ID);
+        if (p->current_token.type == TOKEN_LT) {
+            eat(p, TOKEN_LT);
+            GenericArg args[4];
+            int arg_count = 0;
+            char mangled[512];
+            sprintf(mangled, "%s", name);
+            
+            while (p->current_token.type != TOKEN_GT) {
+                args[arg_count].struct_name = NULL;
+                args[arg_count].type = parse_type(p, &args[arg_count].struct_name);
+                strcat(mangled, "_");
+                strcat(mangled, args[arg_count].struct_name ? args[arg_count].struct_name : type_to_string(args[arg_count].type));
+                arg_count++;
+                if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
+            }
+            eat(p, TOKEN_GT);
+            
+            Template *tmpl = find_template(name);
+            if (tmpl && p->root) {
+                instantiate_enum(p, tmpl, mangled, args, arg_count);
+            }
+            if (struct_name) *struct_name = strdup(mangled);
+        } else {
+            if (struct_name) *struct_name = name;
+        }
         type = TYPE_UNKNOWN;
     }
     while (p->current_token.type == TOKEN_STAR) {
@@ -98,6 +174,8 @@ static ASTNode *parse_atom(Parser *p) {
     return n;
 }
 
+static int in_match_case = 0;
+
 static ASTNode *parse_postfix(Parser *p) {
     ASTNode *n = parse_atom(p);
     while (p->current_token.type == TOKEN_LBRACKET || p->current_token.type == TOKEN_DOT || p->current_token.type == TOKEN_LPAREN) {
@@ -114,7 +192,7 @@ static ASTNode *parse_postfix(Parser *p) {
             eat(p, TOKEN_DOT);
             char *member = strdup(p->current_token.value);
             eat(p, TOKEN_ID);
-            if (p->current_token.type == TOKEN_LPAREN) {
+            if (p->current_token.type == TOKEN_LPAREN && !in_match_case) {
                 eat(p, TOKEN_LPAREN);
                 ASTNode *call = ast_new_func_call(member);
                 call->data.func_call.obj = n;
@@ -128,6 +206,7 @@ static ASTNode *parse_postfix(Parser *p) {
                 n = ast_new_member_access(n, member);
             }
         } else if (t.type == TOKEN_LPAREN) {
+            if (in_match_case) break;
             eat(p, TOKEN_LPAREN);
             if (n->type == AST_VARIABLE) {
                 char *name = strdup(n->data.var_name);
@@ -192,7 +271,7 @@ static ASTNode *parse_comparison(Parser *p) {
     while (p->current_token.type == TOKEN_EQ || p->current_token.type == TOKEN_NEQ ||
            p->current_token.type == TOKEN_LT || p->current_token.type == TOKEN_GT) {
         Token op_t = p->current_token;
-        char *op = (p->current_token.type == TOKEN_EQ) ? "==" :
+        char *op = (op_t.type == TOKEN_EQ) ? "==" :
                    (p->current_token.type == TOKEN_NEQ) ? "!=" :
                    (p->current_token.type == TOKEN_LT) ? "<" : ">";
         eat(p, p->current_token.type);
@@ -207,7 +286,7 @@ static ASTNode *parse_logical(Parser *p) {
     ASTNode *left = parse_comparison(p);
     while (p->current_token.type == TOKEN_AND || p->current_token.type == TOKEN_OR) {
         Token op_t = p->current_token;
-        char *op = (p->current_token.type == TOKEN_AND) ? "&&" : "||";
+        char *op = (op_t.type == TOKEN_AND) ? "&&" : "||";
         eat(p, p->current_token.type);
         ASTNode *right = parse_comparison(p);
         left = ast_new_bin_op(op, left, right);
@@ -229,6 +308,16 @@ static ASTNode *parse_statement(Parser *p) {
         t = p->current_token;
     }
 
+    if (t.type == TOKEN_LBRACE) {
+        eat(p, TOKEN_LBRACE);
+        ASTNode *prog = ast_new_program();
+        while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) {
+            ast_program_add(prog, parse_statement(p));
+        }
+        eat(p, TOKEN_RBRACE);
+        return prog;
+    }
+
     if (t.type == TOKEN_IMPORT) {
         eat(p, TOKEN_IMPORT);
         char *mod = strdup(p->current_token.value);
@@ -241,17 +330,36 @@ static ASTNode *parse_statement(Parser *p) {
         eat(p, TOKEN_ENUM);
         char *name = strdup(p->current_token.value);
         eat(p, TOKEN_ID);
-        eat(p, TOKEN_LBRACE);
         ASTNode *node = ast_new_enum_def(name);
+        if (p->current_token.type == TOKEN_LT) {
+            eat(p, TOKEN_LT);
+            while (p->current_token.type != TOKEN_GT) {
+                char *g_name = strdup(p->current_token.value);
+                eat(p, TOKEN_ID);
+                ast_enum_add_generic(node, g_name);
+                if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
+            }
+            eat(p, TOKEN_GT);
+            add_template(name, node);
+        }
+        eat(p, TOKEN_LBRACE);
         while (p->current_token.type != TOKEN_RBRACE) {
             char *v_name = strdup(p->current_token.value);
             eat(p, TOKEN_ID);
-            ast_enum_add_variant(node, v_name);
+            Type v_type = TYPE_UNKNOWN;
+            char *s_name = NULL;
+            if (p->current_token.type == TOKEN_LPAREN) {
+                eat(p, TOKEN_LPAREN);
+                v_type = parse_type(p, &s_name);
+                eat(p, TOKEN_RPAREN);
+            }
+            ast_enum_add_variant(node, v_name, v_type, s_name);
             if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
         }
         eat(p, TOKEN_RBRACE);
         eat(p, TOKEN_SEMICOLON);
         ast_set_loc(node, t.line, t.col);
+        if (node->data.enum_def.generic_count > 0) return NULL;
         return node;
     } else if (t.type == TOKEN_STRUCT) {
         eat(p, TOKEN_STRUCT);
@@ -296,29 +404,11 @@ static ASTNode *parse_statement(Parser *p) {
         char *struct_name = NULL;
         if (t.type == TOKEN_ID) {
             Token next = lexer_peek(p->lexer);
-            if (next.type == TOKEN_ID || next.type == TOKEN_STAR) {
-                struct_name = strdup(t.value);
-                type = TYPE_UNKNOWN;
-                eat(p, TOKEN_ID);
+            if (next.type == TOKEN_ID || next.type == TOKEN_STAR || next.type == TOKEN_LT) {
+                type = parse_type(p, &struct_name);
             } else goto handle_id_stmt;
         } else {
-            switch (t.type) {
-                case TOKEN_INT: type = TYPE_INT; break;
-                case TOKEN_BOOL: type = TYPE_BOOL; break;
-                case TOKEN_FLOAT: type = TYPE_FLOAT; break;
-                case TOKEN_STRING: type = TYPE_STRING; break;
-                case TOKEN_INT8: type = TYPE_INT8; break;
-                case TOKEN_INT32: type = TYPE_INT32; break;
-                case TOKEN_UINT: type = TYPE_UINT; break;
-                case TOKEN_UINT8: type = TYPE_UINT8; break;
-                case TOKEN_UINT32: type = TYPE_UINT32; break;
-                default: type = TYPE_UNKNOWN; break;
-            }
-            eat(p, t.type);
-        }
-        if (p->current_token.type == TOKEN_STAR) {
-            eat(p, TOKEN_STAR);
-            type = TYPE_PTR;
+            type = parse_type(p, &struct_name);
         }
         char *name = strdup(p->current_token.value);
         eat(p, TOKEN_ID);
@@ -359,24 +449,11 @@ static ASTNode *parse_statement(Parser *p) {
         eat(p, TOKEN_LPAREN);
         ASTNode *condition = parse_expression(p);
         eat(p, TOKEN_RPAREN);
-        ASTNode *then_branch = NULL;
-        if (p->current_token.type == TOKEN_LBRACE) {
-            eat(p, TOKEN_LBRACE);
-            ASTNode *prog = ast_new_program();
-            while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) ast_program_add(prog, parse_statement(p));
-            eat(p, TOKEN_RBRACE);
-            then_branch = prog;
-        } else then_branch = parse_statement(p);
+        ASTNode *then_branch = parse_statement(p);
         ASTNode *else_branch = NULL;
         if (p->current_token.type == TOKEN_ELSE) {
             eat(p, TOKEN_ELSE);
-            if (p->current_token.type == TOKEN_LBRACE) {
-                eat(p, TOKEN_LBRACE);
-                ASTNode *prog = ast_new_program();
-                while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) ast_program_add(prog, parse_statement(p));
-                eat(p, TOKEN_RBRACE);
-                else_branch = prog;
-            } else else_branch = parse_statement(p);
+            else_branch = parse_statement(p);
         }
         ASTNode *node = ast_new_if(condition, then_branch, else_branch);
         ast_set_loc(node, t.line, t.col);
@@ -386,14 +463,7 @@ static ASTNode *parse_statement(Parser *p) {
         eat(p, TOKEN_LPAREN);
         ASTNode *condition = parse_expression(p);
         eat(p, TOKEN_RPAREN);
-        ASTNode *body = NULL;
-        if (p->current_token.type == TOKEN_LBRACE) {
-            eat(p, TOKEN_LBRACE);
-            ASTNode *prog = ast_new_program();
-            while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) ast_program_add(prog, parse_statement(p));
-            eat(p, TOKEN_RBRACE);
-            body = prog;
-        } else body = parse_statement(p);
+        ASTNode *body = parse_statement(p);
         ASTNode *node = ast_new_while(condition, body);
         ast_set_loc(node, t.line, t.col);
         return node;
@@ -409,7 +479,7 @@ static ASTNode *parse_statement(Parser *p) {
             Type p_type = parse_type(p, &s_name);
             char *p_name = strdup(p->current_token.value);
             eat(p, TOKEN_ID);
-            ast_func_add_param(node, p_type, p_name);
+            ast_func_add_param(node, p_type, p_name, s_name);
             if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
         }
         eat(p, TOKEN_RPAREN);
@@ -418,11 +488,7 @@ static ASTNode *parse_statement(Parser *p) {
             char *s_name = NULL;
             node->data.func_decl.return_type = parse_type(p, &s_name);
         }
-        eat(p, TOKEN_LBRACE);
-        ASTNode *body = ast_new_program();
-        while (p->current_token.type != TOKEN_RBRACE && p->current_token.type != TOKEN_EOF) ast_program_add(body, parse_statement(p));
-        eat(p, TOKEN_RBRACE);
-        node->data.func_decl.body = body;
+        node->data.func_decl.body = parse_statement(p);
         ast_set_loc(node, t.line, t.col);
         return node;
     } else if (t.type == TOKEN_EXTERN) {
@@ -437,7 +503,7 @@ static ASTNode *parse_statement(Parser *p) {
             Type p_type = parse_type(p, &s_name);
             char *p_name = strdup(p->current_token.value);
             eat(p, TOKEN_ID);
-            ast_func_add_param(node, p_type, p_name);
+            ast_func_add_param(node, p_type, p_name, s_name);
             if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
         }
         eat(p, TOKEN_RPAREN);
@@ -470,10 +536,19 @@ static ASTNode *parse_statement(Parser *p) {
         ast_set_loc(match_node, t.line, t.col);
         while (p->current_token.type == TOKEN_CASE) {
             eat(p, TOKEN_CASE);
+            in_match_case = 1;
             ASTNode *case_val = parse_expression(p);
+            in_match_case = 0;
+            char *capture_var = NULL;
+            if (p->current_token.type == TOKEN_LPAREN) {
+                eat(p, TOKEN_LPAREN);
+                capture_var = strdup(p->current_token.value);
+                eat(p, TOKEN_ID);
+                eat(p, TOKEN_RPAREN);
+            }
             eat(p, TOKEN_COLON);
             ASTNode *stmt = parse_statement(p);
-            ast_match_add_case(match_node, case_val, stmt);
+            ast_match_add_case(match_node, case_val, capture_var, stmt);
         }
         if (p->current_token.type == TOKEN_DEFAULT) {
             eat(p, TOKEN_DEFAULT);
@@ -574,10 +649,10 @@ handle_id_stmt:;
 }
 
 ASTNode *parser_parse(Parser *p) {
-    ASTNode *prog = ast_new_program();
+    p->root = ast_new_program();
     while (p->current_token.type != TOKEN_EOF) {
         ASTNode *stmt = parse_statement(p);
-        if (stmt) ast_program_add(prog, stmt);
+        if (stmt) ast_program_add(p->root, stmt);
     }
-    return prog;
+    return p->root;
 }
