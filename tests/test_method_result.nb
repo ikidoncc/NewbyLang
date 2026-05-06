@@ -1,0 +1,27 @@
+enum Result<T, E> {
+    Ok(T),
+    Err(E)
+};
+
+struct Calculator {
+    int last_result;
+
+    func divide(int a, int b) : Result<int, string> {
+        if (b == 0) {
+            return Result_int_string.Err("Division by zero");
+        }
+        self.last_result = a / b;
+        return Result_int_string.Ok(self.last_result);
+    }
+};
+
+Calculator calc;
+match (calc.divide(10, 2)) {
+    case Result_int_string.Ok(v): { print(v); }
+    case Result_int_string.Err(e): { print(e); }
+}
+
+match (calc.divide(10, 0)) {
+    case Result_int_string.Ok(v): { print(v); }
+    case Result_int_string.Err(e): { print(e); }
+}

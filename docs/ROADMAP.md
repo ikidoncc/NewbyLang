@@ -5,7 +5,7 @@ Este documento define as funcionalidades essenciais do **Newby** antes da estabi
 ---
 
 ## 🧭 Prioridades Imediatas (Próxima Fase)
-1.  **OOP Leve**: Implementar métodos em Structs (`p.metodo()`).
+1.  [x] **OOP Leve**: Implementar métodos em Structs (`p.metodo()`).
 2.  **Expressividade**: Enums reais e Pattern Matching avançado.
 3.  **Linker Inteligente**: Automação do linking de múltiplos arquivos `.o`.
 
@@ -70,7 +70,7 @@ Este documento define as funcionalidades essenciais do **Newby** antes da estabi
 - [ ] imutabilidade opcional
 
 ## OOP leve
-- [ ] structs com métodos -- **ALTA PRIORIDADE**
+- [x] structs com métodos -- **ALTA PRIORIDADE**
 - [ ] encapsulamento via `pub/private`
 - [ ] traits como base de polimorfismo
 

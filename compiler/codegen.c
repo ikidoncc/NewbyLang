@@ -64,7 +64,7 @@ static void gen_lvalue(Codegen *cg, ASTNode *node) {
         gen_expression(cg, node->data.array_access.index);
         fprintf(cg->out, "    pop rbx\n    imul rbx, 8\n    mov rcx, rbp\n    sub rcx, %d\n    add rcx, rbx\n    push rcx\n", s->stack_offset);
     } else if (node->type == AST_MEMBER_ACCESS) {
-        gen_lvalue(cg, node);
+        gen_lvalue(cg, node->data.member_access.ptr);
         fprintf(cg->out, "    pop rax\n");
         int offset = 0;
         for(int i=0; i<cg->struct_count; i++) {
@@ -147,7 +147,7 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
             else total_words += 1;
         }
 
-        for (int i = 0; i < total_words; i++) {
+        for (int i = total_words - 1; i >= 0; i--) {
             fprintf(cg->out, "    pop %s\n", reg_params[i]);
         }
 

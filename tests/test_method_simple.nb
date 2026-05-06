@@ -1,0 +1,26 @@
+struct Point {
+    int x;
+    int y;
+
+    func set(int x, int y) {
+        self.x = x;
+        self.y = y;
+    }
+
+    func print_pt() {
+        print(self.x);
+        print(self.y);
+    }
+
+    func move(int dx, int dy) {
+        self.set(self.x + dx, self.y + dy);
+    }
+
+    func get_sum() : int {
+        return self.x + self.y;
+    }
+};
+
+Point p;
+p.set(10, 20);
+print(p.get_sum());
