@@ -124,5 +124,6 @@ void ast_match_add_case(ASTNode *match, ASTNode *val_node, char *capture_var, AS
 void ast_match_set_default(ASTNode *match, ASTNode *stmt);
 void ast_program_add(ASTNode *program, ASTNode *node);
 void ast_set_loc(ASTNode *node, int line, int col);
+void ast_free(ASTNode *node);
 
 #endif

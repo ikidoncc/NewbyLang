@@ -47,7 +47,11 @@ ASTNode *compile_file(const char *filename) {
     if (!src) return NULL;
     Lexer *lexer = lexer_new(src);
     Parser *parser = parser_new(lexer);
-    return parser_parse(parser);
+    ASTNode *root = parser_parse(parser);
+    parser_free(parser);
+    lexer_free(lexer);
+    free(src);
+    return root;
 }
 
 void process_imports(ASTNode *root, int is_root) {
@@ -99,6 +103,7 @@ void process_imports(ASTNode *root, int is_root) {
                     ast_program_add(root, ext);
                 }
             }
+            ast_free(imp);
         }
     }
 }
@@ -144,8 +149,16 @@ int main(int argc, char **argv) {
     
     char cmd[2048];
     sprintf(cmd, "nasm -f elf64 %s -o %s", asm_filename, obj_filename);
-    if (system(cmd) != 0) return 1;
+    int res = system(cmd);
     remove(asm_filename);
+    if (res != 0) {
+        codegen_free(cg);
+        symtab_free(sem_tab);
+        semantic_cleanup();
+        ast_free(root);
+        for (int i = 0; i < link_object_count; i++) free(link_objects[i]);
+        return 1;
+    }
 
     if (!compile_only) {
         char link_cmd[4096];
@@ -160,6 +173,11 @@ int main(int argc, char **argv) {
         
         if (system(link_cmd) != 0) {
             fprintf(stderr, "Linking failed.\n");
+            codegen_free(cg);
+            symtab_free(sem_tab);
+            semantic_cleanup();
+            ast_free(root);
+            for (int i = 0; i < link_object_count; i++) free(link_objects[i]);
             return 1;
         }
         printf("Compilation successful! Executable generated: ./%s\n", base_name);
@@ -167,5 +185,12 @@ int main(int argc, char **argv) {
     } else {
         printf("Object file generated: %s\n", obj_filename);
     }
+
+    codegen_free(cg);
+    symtab_free(sem_tab);
+    semantic_cleanup();
+    ast_free(root);
+    for (int i = 0; i < link_object_count; i++) free(link_objects[i]);
+
     return 0;
 }

@@ -53,6 +53,25 @@ int semantic_is_enum(const char *name) {
     return find_enum_def(name) != NULL;
 }
 
+void semantic_cleanup() {
+    for (int i = 0; i < global_struct_count; i++) {
+        free(global_structs[i].name);
+        for (int j = 0; j < global_structs[i].member_count; j++) {
+            free(global_structs[i].members[j].name);
+        }
+    }
+    for (int i = 0; i < global_enum_count; i++) {
+        free(global_enums[i].name);
+        for (int j = 0; j < global_enums[i].variant_count; j++) {
+            free(global_enums[i].variants[j].name);
+            if (global_enums[i].variants[j].struct_name) free(global_enums[i].variants[j].struct_name);
+        }
+    }
+    for (int i = 0; i < global_module_count; i++) {
+        free(global_modules[i]);
+    }
+}
+
 void semantic_analyze(ASTNode *node, SymbolTable *tab) {
     if (!node) return;
 

@@ -15,6 +15,19 @@ Codegen *codegen_new(FILE *out, const char *module_name) {
     return cg;
 }
 
+void codegen_free(Codegen *cg) {
+    if (!cg) return;
+    free(cg->module_name);
+    for (int i = 0; i < cg->struct_count; i++) {
+        free(cg->structs[i].name);
+        for (int j = 0; j < cg->structs[i].member_count; j++) {
+            free(cg->structs[i].members[j].name);
+        }
+    }
+    symtab_free(cg->tab);
+    free(cg);
+}
+
 static int label_count = 0;
 static int data_count = 0;
 

@@ -24,5 +24,6 @@ typedef struct {
 
 Codegen *codegen_new(FILE *out, const char *module_name);
 void codegen_generate(Codegen *cg, ASTNode *node);
+void codegen_free(Codegen *cg);
 
 #endif

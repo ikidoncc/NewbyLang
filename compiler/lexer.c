@@ -13,6 +13,11 @@ Lexer *lexer_new(const char *src) {
     return lexer;
 }
 
+void lexer_free(Lexer *l) {
+    if (!l) return;
+    free(l);
+}
+
 static Token create_token(TokenType type, const char *val, int line, int col) {
     Token t;
     t.type = type;

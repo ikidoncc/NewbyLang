@@ -3,12 +3,31 @@
 #include <string.h>
 #include "parser.h"
 
+typedef struct {
+    char *name;
+    ASTNode *node;
+} Template;
+
+static Template global_templates[16];
+static int global_template_count = 0;
+
 Parser *parser_new(Lexer *lexer) {
     Parser *p = malloc(sizeof(Parser));
     p->lexer = lexer;
     p->current_token = lexer_next_token(lexer);
     p->root = NULL;
     return p;
+}
+
+void parser_free(Parser *p) {
+    if (!p) return;
+    if (p->current_token.value) free(p->current_token.value);
+    for (int i = 0; i < global_template_count; i++) {
+        free(global_templates[i].name);
+        ast_free(global_templates[i].node);
+    }
+    global_template_count = 0;
+    free(p);
 }
 
 static void eat(Parser *p, TokenType type) {
@@ -24,14 +43,6 @@ static void eat(Parser *p, TokenType type) {
 }
 
 static ASTNode *parse_expression(Parser *p);
-
-typedef struct {
-    char *name;
-    ASTNode *node;
-} Template;
-
-static Template global_templates[16];
-static int global_template_count = 0;
 
 static void add_template(char *name, ASTNode *node) {
     global_templates[global_template_count].name = strdup(name);

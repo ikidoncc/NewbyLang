@@ -387,3 +387,140 @@ void ast_program_add(ASTNode *program, ASTNode *node) {
     program->data.program.nodes = realloc(program->data.program.nodes, sizeof(ASTNode*) * program->data.program.count);
     program->data.program.nodes[program->data.program.count - 1] = node;
 }
+
+void ast_free(ASTNode *node) {
+    if (!node) return;
+    switch (node->type) {
+        case AST_VAR_DECL:
+            free(node->data.var_decl.name);
+            if (node->data.var_decl.value) ast_free(node->data.var_decl.value);
+            if (node->data.var_decl.struct_name) free(node->data.var_decl.struct_name);
+            if (node->data.var_decl.enum_name) free(node->data.var_decl.enum_name);
+            break;
+        case AST_ARRAY_DECL:
+            free(node->data.array_decl.name);
+            break;
+        case AST_ASSIGN:
+            free(node->data.assign.name);
+            ast_free(node->data.assign.value);
+            break;
+        case AST_ARRAY_ASSIGN:
+            free(node->data.array_assign.name);
+            ast_free(node->data.array_assign.index);
+            ast_free(node->data.array_assign.value);
+            break;
+        case AST_DEREF_ASSIGN:
+            ast_free(node->data.deref_assign.ptr);
+            ast_free(node->data.deref_assign.value);
+            break;
+        case AST_MEMBER_ASSIGN:
+            ast_free(node->data.member_assign.obj);
+            free(node->data.member_assign.member);
+            ast_free(node->data.member_assign.value);
+            break;
+        case AST_FUNC_DECL:
+        case AST_EXTERN_DECL:
+            free(node->data.func_decl.name);
+            if (node->data.func_decl.return_struct_name) free(node->data.func_decl.return_struct_name);
+            for (int i = 0; i < node->data.func_decl.param_count; i++) {
+                free(node->data.func_decl.params[i].name);
+                if (node->data.func_decl.params[i].struct_name) free(node->data.func_decl.params[i].struct_name);
+            }
+            if (node->data.func_decl.body) ast_free(node->data.func_decl.body);
+            if (node->data.func_decl.parent_struct) free(node->data.func_decl.parent_struct);
+            break;
+        case AST_FUNC_CALL:
+            free(node->data.func_call.name);
+            for (int i = 0; i < node->data.func_call.arg_count; i++) ast_free(node->data.func_call.args[i]);
+            if (node->data.func_call.obj) ast_free(node->data.func_call.obj);
+            break;
+        case AST_STRUCT_DEF:
+            free(node->data.struct_def.name);
+            for (int i = 0; i < node->data.struct_def.member_count; i++) {
+                free(node->data.struct_def.members[i].name);
+            }
+            for (int i = 0; i < node->data.struct_def.method_count; i++) {
+                ast_free(node->data.struct_def.methods[i]);
+            }
+            break;
+        case AST_ENUM_DEF:
+            free(node->data.enum_def.name);
+            for (int i = 0; i < node->data.enum_def.variant_count; i++) {
+                free(node->data.enum_def.variants[i].name);
+                if (node->data.enum_def.variants[i].struct_name) free(node->data.enum_def.variants[i].struct_name);
+            }
+            for (int i = 0; i < node->data.enum_def.generic_count; i++) {
+                free(node->data.enum_def.generic_params[i]);
+            }
+            break;
+        case AST_MEMBER_ACCESS:
+            ast_free(node->data.member_access.ptr);
+            free(node->data.member_access.member);
+            break;
+        case AST_SIZEOF:
+            if (node->data.size_of.struct_name) free(node->data.size_of.struct_name);
+            break;
+        case AST_NS_ACCESS:
+            free(node->data.ns_access.module);
+            free(node->data.ns_access.name);
+            break;
+        case AST_IMPORT:
+            free(node->data.import.module_name);
+            break;
+        case AST_SYSCALL:
+            for (int i = 0; i < node->data.syscall.arg_count; i++) ast_free(node->data.syscall.args[i]);
+            break;
+        case AST_TRY:
+            ast_free(node->data.try.expr);
+            break;
+        case AST_RETURN:
+            ast_free(node->data.ret.expr);
+            break;
+        case AST_ADDR_OF:
+            ast_free(node->data.addr_of.expr);
+            break;
+        case AST_DEREF:
+            ast_free(node->data.deref.expr);
+            break;
+        case AST_BIN_OP:
+            ast_free(node->data.bin_op.left);
+            ast_free(node->data.bin_op.right);
+            break;
+        case AST_VARIABLE:
+            free(node->data.var_name);
+            break;
+        case AST_ARRAY_ACCESS:
+            free(node->data.array_access.name);
+            ast_free(node->data.array_access.index);
+            break;
+        case AST_PRINT:
+            ast_free(node->data.print_expr);
+            break;
+        case AST_PROGRAM:
+            for (int i = 0; i < node->data.program.count; i++) ast_free(node->data.program.nodes[i]);
+            free(node->data.program.nodes);
+            break;
+        case AST_IF:
+            ast_free(node->data.if_stmt.condition);
+            ast_free(node->data.if_stmt.then_branch);
+            if (node->data.if_stmt.else_branch) ast_free(node->data.if_stmt.else_branch);
+            break;
+        case AST_WHILE:
+            ast_free(node->data.while_stmt.condition);
+            ast_free(node->data.while_stmt.body);
+            break;
+        case AST_MATCH:
+            ast_free(node->data.match.expr);
+            for (int i = 0; i < node->data.match.case_count; i++) ast_free(node->data.match.cases[i]);
+            free(node->data.match.cases);
+            if (node->data.match.default_case) ast_free(node->data.match.default_case);
+            break;
+        case AST_CASE:
+            ast_free(node->data.match_case.val_node);
+            if (node->data.match_case.capture_var) free(node->data.match_case.capture_var);
+            ast_free(node->data.match_case.stmt);
+            break;
+        default: break;
+    }
+    free(node);
+}

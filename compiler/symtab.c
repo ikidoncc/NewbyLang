@@ -30,3 +30,13 @@ Symbol *symtab_lookup(SymbolTable *tab, char *name) {
     if (tab->parent) return symtab_lookup(tab->parent, name);
     return NULL;
 }
+
+void symtab_free(SymbolTable *tab) {
+    if (!tab) return;
+    for (int i = 0; i < tab->count; i++) {
+        free(tab->symbols[i].name);
+        if (tab->symbols[i].struct_name) free(tab->symbols[i].struct_name);
+    }
+    free(tab->symbols);
+    free(tab);
+}

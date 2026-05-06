@@ -79,5 +79,6 @@ Lexer *lexer_new(const char *src);
 Token lexer_next_token(Lexer *lexer);
 Token lexer_peek(Lexer *lexer);
 void token_free(Token token);
+void lexer_free(Lexer *l);
 
 #endif
