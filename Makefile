@@ -10,7 +10,7 @@ $(TARGET): $(OBJ)
 	$(CC) $(OBJ) -o $(TARGET)
 
 run: $(TARGET)
-	./$(TARGET) tests/hello.nb
+	./$(TARGET) tests/hello.nby
 	./hello
 
 clean:

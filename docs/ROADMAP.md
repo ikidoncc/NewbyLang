@@ -52,7 +52,7 @@ Este documento define as funcionalidades essenciais do **Newby** antes da estabi
 # 4. 🧩 Modularidade e Organização
 
 - [x] namespaces (`IO.print`, `Log.print`)
-- [x] `import` de arquivos `.nb`
+- [x] `import` de arquivos `.nby`
 - [x] visibilidade (`pub`, `private`)
 - [ ] resolução de módulos por path completo
 

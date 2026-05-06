@@ -1,6 +1,6 @@
 # Newby Compiler (nbc)
 
-Este é um projeto educacional do **Newby**, um compilador minimalista escrito em **C puro**, que converte código-fonte `.nb` para executáveis binários nativos x86-64 Linux.
+Este é um projeto educacional do **Newby**, um compilador minimalista escrito em **C puro**, que converte código-fonte `.nby` para executáveis binários nativos x86-64 Linux.
 
 O foco deste projeto é didático, demonstrando as etapas fundamentais da construção de um compilador real, desde a análise léxica até a geração de código binário.
 
@@ -36,9 +36,9 @@ make
 ```
 
 ### 2. Compilar um Código Newby
-O compilador gera automaticamente um executável com o mesmo nome do arquivo de entrada (sem a extensão `.nb`):
+O compilador gera automaticamente um executável com o mesmo nome do arquivo de entrada (sem a extensão `.nby`):
 ```bash
-./nbc hello.nb
+./nbc hello.nby
 ```
 
 ### 3. Executar o Binário Gerado
@@ -47,12 +47,12 @@ O compilador gera automaticamente um executável com o mesmo nome do arquivo de 
 ```
 
 ### 4. Atalho de Desenvolvimento
-Para compilar o `nbc`, compilar `hello.nb` e executar o resultado em um único passo:
+Para compilar o `nbc`, compilar `hello.nby` e executar o resultado em um único passo:
 ```bash
 make run
 ```
 
-## 📝 Exemplo de Código Newby (`hello.nb`)
+## 📝 Exemplo de Código Newby (`hello.nby`)
 
 ```c
 int x = 3;

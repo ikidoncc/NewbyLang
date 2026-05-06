@@ -1,4 +1,4 @@
-import "tests/math.nb";
+import "tests/math.nby";
 
 int res = math.triplo(10);
 print(res);
