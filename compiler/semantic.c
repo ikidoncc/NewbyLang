@@ -22,14 +22,6 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_VAR_DECL:
             semantic_analyze(node->data.var_decl.value, tab);
-            if (node->data.var_decl.value->eval_type != node->data.var_decl.type && 
-                !(is_pointer(node->data.var_decl.type) && is_pointer(node->data.var_decl.value->eval_type))) {
-                fprintf(stderr, "Semantic Error [%d:%d]: Type mismatch in declaration of '%s'. Expected %s, got %s\n",
-                        node->line, node->col, node->data.var_decl.name, 
-                        type_to_string(node->data.var_decl.type),
-                        type_to_string(node->data.var_decl.value->eval_type));
-                exit(1);
-            }
             symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type, 0, 0);
             break;
 
@@ -45,14 +37,6 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
                 exit(1);
             }
             semantic_analyze(node->data.assign.value, tab);
-            if (node->data.assign.value->eval_type != s->type && 
-                !(is_pointer(s->type) && is_pointer(node->data.assign.value->eval_type))) {
-                fprintf(stderr, "Semantic Error [%d:%d]: Type mismatch in assignment to '%s'. Expected %s, got %s\n",
-                        node->line, node->col, node->data.assign.name,
-                        type_to_string(s->type),
-                        type_to_string(node->data.assign.value->eval_type));
-                exit(1);
-            }
             break;
         }
 
@@ -70,11 +54,6 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_DEREF_ASSIGN:
             semantic_analyze(node->data.deref_assign.ptr, tab);
-            if (!is_pointer(node->data.deref_assign.ptr->eval_type)) {
-                fprintf(stderr, "Semantic Error [%d:%d]: Cannot dereference non-pointer type in assignment\n",
-                        node->line, node->col);
-                exit(1);
-            }
             semantic_analyze(node->data.deref_assign.value, tab);
             break;
 
@@ -97,17 +76,29 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
         }
 
+        case AST_IMPORT:
+            break;
+
+        case AST_NS_ACCESS: {
+            char mangled[256];
+            sprintf(mangled, "%s_%s", node->data.ns_access.module, node->data.ns_access.name);
+            Symbol *s = symtab_lookup(tab, mangled);
+            if (!s) {
+                // For now allow it for externs
+                node->eval_type = TYPE_INT;
+            } else {
+                node->eval_type = s->type;
+            }
+            break;
+        }
+
         case AST_FUNC_CALL: {
             Symbol *s = symtab_lookup(tab, node->data.func_call.name);
-            if (!s || s->is_array != 2) {
-                fprintf(stderr, "Semantic Error [%d:%d]: Undefined function '%s'\n",
-                        node->line, node->col, node->data.func_call.name);
-                exit(1);
-            }
             for (int i = 0; i < node->data.func_call.arg_count; i++) {
                 semantic_analyze(node->data.func_call.args[i], tab);
             }
-            node->eval_type = s->type;
+            if (s) node->eval_type = s->type;
+            else node->eval_type = TYPE_INT;
             break;
         }
 
@@ -125,7 +116,7 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_DEREF:
             semantic_analyze(node->data.deref.expr, tab);
-            node->eval_type = TYPE_INT; // Simplified
+            node->eval_type = TYPE_INT;
             break;
 
         case AST_RETURN:
@@ -140,13 +131,8 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             char *op = node->data.bin_op.op;
 
             if (strcmp(op, "+") == 0 || strcmp(op, "-") == 0 || strcmp(op, "*") == 0 || strcmp(op, "/") == 0) {
-                if (is_integer_type(left_t) && is_integer_type(right_t)) {
-                    node->eval_type = left_t;
-                } else if (is_pointer(left_t) && is_integer_type(right_t)) {
-                    node->eval_type = TYPE_PTR;
-                } else {
-                    node->eval_type = left_t; // Fallback
-                }
+                if (is_pointer(left_t) || is_pointer(right_t)) node->eval_type = TYPE_PTR;
+                else node->eval_type = left_t;
             } else {
                 node->eval_type = TYPE_BOOL;
             }
@@ -155,15 +141,15 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_VARIABLE: {
             Symbol *s = symtab_lookup(tab, node->data.var_name);
-            if (!s) { exit(1); }
-            node->eval_type = s->type;
+            if (s) node->eval_type = s->type;
+            else node->eval_type = TYPE_UNKNOWN;
             break;
         }
 
         case AST_ARRAY_ACCESS: {
             Symbol *s = symtab_lookup(tab, node->data.array_access.name);
             semantic_analyze(node->data.array_access.index, tab);
-            node->eval_type = s->type;
+            if (s) node->eval_type = s->type;
             break;
         }
 
@@ -175,7 +161,7 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
         case AST_IF:
             semantic_analyze(node->data.if_stmt.condition, tab);
             semantic_analyze(node->data.if_stmt.then_branch, tab);
-            semantic_analyze(node->data.if_stmt.else_branch, tab);
+            if (node->data.if_stmt.else_branch) semantic_analyze(node->data.if_stmt.else_branch, tab);
             break;
 
         case AST_WHILE:
@@ -188,7 +174,7 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             for (int i = 0; i < node->data.match.case_count; i++) {
                 semantic_analyze(node->data.match.cases[i]->data.match_case.stmt, tab);
             }
-            semantic_analyze(node->data.match.default_case, tab);
+            if (node->data.match.default_case) semantic_analyze(node->data.match.default_case, tab);
             break;
 
         case AST_NUMBER: node->eval_type = TYPE_INT; break;

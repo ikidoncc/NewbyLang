@@ -9,9 +9,10 @@ typedef struct {
     FILE *out;
     SymbolTable *tab;
     int stack_pos;
+    char *module_name;
 } Codegen;
 
-Codegen *codegen_new(FILE *out);
+Codegen *codegen_new(FILE *out, const char *module_name);
 void codegen_generate(Codegen *cg, ASTNode *node);
 
 #endif

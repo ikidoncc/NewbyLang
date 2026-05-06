@@ -85,6 +85,8 @@ Token lexer_next_token(Lexer *lexer) {
         else if (strcmp(val, "func") == 0) t = create_token(TOKEN_FUNC, NULL, start_line, start_col);
         else if (strcmp(val, "extern") == 0) t = create_token(TOKEN_EXTERN, NULL, start_line, start_col);
         else if (strcmp(val, "syscall") == 0) t = create_token(TOKEN_SYSCALL, NULL, start_line, start_col);
+        else if (strcmp(val, "import") == 0) t = create_token(TOKEN_IMPORT, NULL, start_line, start_col);
+        else if (strcmp(val, "pub") == 0) t = create_token(TOKEN_PUB, NULL, start_line, start_col);
         else if (strcmp(val, "return") == 0) t = create_token(TOKEN_RETURN, NULL, start_line, start_col);
         else if (strcmp(val, "match") == 0) t = create_token(TOKEN_MATCH, NULL, start_line, start_col);
         else if (strcmp(val, "case") == 0) t = create_token(TOKEN_CASE, NULL, start_line, start_col);
@@ -134,6 +136,7 @@ Token lexer_next_token(Lexer *lexer) {
         case '-': return create_token(TOKEN_MINUS, NULL, start_line, start_col);
         case '*': return create_token(TOKEN_STAR, NULL, start_line, start_col);
         case '/': return create_token(TOKEN_SLASH, NULL, start_line, start_col);
+        case '.': return create_token(TOKEN_DOT, NULL, start_line, start_col);
         case ';': return create_token(TOKEN_SEMICOLON, NULL, start_line, start_col);
         case ':': return create_token(TOKEN_COLON, NULL, start_line, start_col);
         case ',': return create_token(TOKEN_COMMA, NULL, start_line, start_col);

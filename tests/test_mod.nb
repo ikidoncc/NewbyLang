@@ -1,0 +1,4 @@
+import "tests/math.nb";
+
+int res = math.triplo(10);
+print(res);

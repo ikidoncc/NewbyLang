@@ -3,16 +3,18 @@
 #include <string.h>
 #include "codegen.h"
 
-Codegen *codegen_new(FILE *out) {
+Codegen *codegen_new(FILE *out, const char *module_name) {
     Codegen *cg = malloc(sizeof(Codegen));
     cg->out = out;
     cg->tab = symtab_new(NULL);
     cg->stack_pos = 0;
+    cg->module_name = strdup(module_name);
     return cg;
 }
 
 static int label_count = 0;
 static int data_count = 0;
+static int main_prog_done = 0;
 
 static int new_label() {
     return ++label_count;
@@ -41,6 +43,13 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
         if (!s) { fprintf(stderr, "Undefined variable: %s\n", node->data.var_name); exit(1); }
         fprintf(cg->out, "    mov rax, [rbp - %d]\n", s->stack_offset);
         fprintf(cg->out, "    push rax\n");
+    } else if (node->type == AST_NS_ACCESS) {
+        char mangled[512];
+        sprintf(mangled, "%s_%s", node->data.ns_access.module, node->data.ns_access.name);
+        // Assuming it's a global variable for now (not fully implemented)
+        fprintf(cg->out, "    extern %s\n", mangled);
+        fprintf(cg->out, "    mov rax, [%s]\n", mangled);
+        fprintf(cg->out, "    push rax\n");
     } else if (node->type == AST_ARRAY_ACCESS) {
         Symbol *s = symtab_lookup(cg->tab, node->data.array_access.name);
         gen_expression(cg, node->data.array_access.index);
@@ -50,45 +59,35 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
         for (int i = 0; i < node->data.func_call.arg_count; i++) gen_expression(cg, node->data.func_call.args[i]);
         for (int i = node->data.func_call.arg_count - 1; i >= 0; i--) fprintf(cg->out, "    pop %s\n", reg_params[i]);
         fprintf(cg->out, "    call %s\n    push rax\n", node->data.func_call.name);
-    } else if (node->type == AST_ADDR_OF) {
-        if (node->data.addr_of.expr->type == AST_VARIABLE) {
-            Symbol *s = symtab_lookup(cg->tab, node->data.addr_of.expr->data.var_name);
-            fprintf(cg->out, "    lea rax, [rbp - %d]\n", s->stack_offset);
-            fprintf(cg->out, "    push rax\n");
-        } else if (node->data.addr_of.expr->type == AST_ARRAY_ACCESS) {
-            Symbol *s = symtab_lookup(cg->tab, node->data.addr_of.expr->data.array_access.name);
-            gen_expression(cg, node->data.addr_of.expr->data.array_access.index);
-            fprintf(cg->out, "    pop rbx\n    imul rbx, 8\n    mov rcx, rbp\n    sub rcx, %d\n    add rcx, rbx\n    push rcx\n", s->stack_offset);
-        }
-    } else if (node->type == AST_DEREF) {
-        gen_expression(cg, node->data.deref.expr);
-        fprintf(cg->out, "    pop rax\n    mov rax, [rax]\n    push rax\n");
     } else if (node->type == AST_SYSCALL) {
         char *reg_syscall[] = {"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"};
         for (int i = 0; i < node->data.syscall.arg_count; i++) gen_expression(cg, node->data.syscall.args[i]);
         for (int i = node->data.syscall.arg_count - 1; i >= 0; i--) fprintf(cg->out, "    pop %s\n", reg_syscall[i]);
         fprintf(cg->out, "    syscall\n    push rax\n");
+    } else if (node->type == AST_ADDR_OF) {
+        if (node->data.addr_of.expr->type == AST_VARIABLE) {
+            Symbol *s = symtab_lookup(cg->tab, node->data.addr_of.expr->data.var_name);
+            fprintf(cg->out, "    lea rax, [rbp - %d]\n", s->stack_offset);
+            fprintf(cg->out, "    push rax\n");
+        }
+    } else if (node->type == AST_DEREF) {
+        gen_expression(cg, node->data.deref.expr);
+        fprintf(cg->out, "    pop rax\n    mov rax, [rax]\n    push rax\n");
     } else if (node->type == AST_BIN_OP) {
         gen_expression(cg, node->data.bin_op.left);
         gen_expression(cg, node->data.bin_op.right);
         fprintf(cg->out, "    pop rbx\n    pop rax\n");
         char *op = node->data.bin_op.op;
         if (strcmp(op, "+") == 0) {
-            if (is_pointer(node->data.bin_op.left->eval_type)) {
-                fprintf(cg->out, "    imul rbx, 8\n");
-            } else if (is_pointer(node->data.bin_op.right->eval_type)) {
-                fprintf(cg->out, "    imul rax, 8\n");
-            }
+            if (is_pointer(node->data.bin_op.left->eval_type)) fprintf(cg->out, "    imul rbx, 8\n");
+            else if (is_pointer(node->data.bin_op.right->eval_type)) fprintf(cg->out, "    imul rax, 8\n");
             fprintf(cg->out, "    add rax, rbx\n");
         } else if (strcmp(op, "-") == 0) {
-            if (is_pointer(node->data.bin_op.left->eval_type)) {
-                fprintf(cg->out, "    imul rbx, 8\n");
-            }
+            if (is_pointer(node->data.bin_op.left->eval_type)) fprintf(cg->out, "    imul rbx, 8\n");
             fprintf(cg->out, "    sub rax, rbx\n");
         } else if (strcmp(op, "*") == 0) fprintf(cg->out, "    imul rax, rbx\n");
         else if (strcmp(op, "/") == 0) { fprintf(cg->out, "    xor rdx, rdx\n    idiv rbx\n"); }
         else if (strcmp(op, "==") == 0) { fprintf(cg->out, "    cmp rax, rbx\n    sete al\n    movzx rax, al\n"); }
-        else if (strcmp(op, "!=") == 0) { fprintf(cg->out, "    cmp rax, rbx\n    setne al\n    movzx rax, al\n"); }
         else if (strcmp(op, "<") == 0) { fprintf(cg->out, "    cmp rax, rbx\n    setl al\n    movzx rax, al\n"); }
         else if (strcmp(op, ">") == 0) { fprintf(cg->out, "    cmp rax, rbx\n    setg al\n    movzx rax, al\n"); }
         else if (strcmp(op, "&&") == 0) fprintf(cg->out, "    and rax, rbx\n");
@@ -105,46 +104,32 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
             top_level = 0;
             fprintf(cg->out, "section .data\n    t_str db 'true', 10\n    f_str db 'false', 10\n");
             fprintf(cg->out, "section .text\nglobal _start\n\n");
-            
-            // Gerar primeiro as declarações extern e funções
             for (int i = 0; i < node->data.program.count; i++) {
                 ASTNode *n = node->data.program.nodes[i];
-                if (n->type == AST_EXTERN_DECL || n->type == AST_FUNC_DECL) {
-                    codegen_generate(cg, n);
-                }
+                if (n->type == AST_EXTERN_DECL || n->type == AST_FUNC_DECL) codegen_generate(cg, n);
             }
-
-            // Gerar o ponto de entrada
             fprintf(cg->out, "_start:\n    push rbp\n    mov rbp, rsp\n    sub rsp, 1024\n\n");
-            
-            // Gerar o restante do código (main)
             for (int i = 0; i < node->data.program.count; i++) {
                 ASTNode *n = node->data.program.nodes[i];
-                if (n->type != AST_EXTERN_DECL && n->type != AST_FUNC_DECL) {
-                    codegen_generate(cg, n);
-                }
+                if (n->type != AST_EXTERN_DECL && n->type != AST_FUNC_DECL) codegen_generate(cg, n);
             }
-
-            // Saída padrão se o programa chegar ao fim
             fprintf(cg->out, "\n    mov rax, 60\n    xor rdi, rdi\n    syscall\n\n");
-
-            // Helpers
             fprintf(cg->out, "print_num:\n    push rbp\n    mov rbp, rsp\n    sub rsp, 32\n    mov rax, rdi\n    mov rcx, 10\n    mov rsi, rbp\n    dec rsi\n    mov byte [rsi], 10\n.loop:\n    xor rdx, rdx\n    div rcx\n    add dl, '0'\n    dec rsi\n    mov [rsi], dl\n    test rax, rax\n    jnz .loop\n    mov rax, 1\n    mov rdi, 1\n    mov rdx, rbp\n    sub rdx, rsi\n    syscall\n    leave\n    ret\n\n");
             fprintf(cg->out, "print_bool:\n    push rbp\n    mov rbp, rsp\n    test rdi, rdi\n    jz .f\n    mov rax, 1\n    mov rdi, 1\n    mov rsi, t_str\n    mov rdx, 5\n    syscall\n    jmp .e\n.f:\n    mov rax, 1\n    mov rdi, 1\n    mov rsi, f_str\n    mov rdx, 6\n    syscall\n.e:\n    leave\n    ret\n\n");
             fprintf(cg->out, "print_string:\n    push rbp\n    mov rbp, rsp\n    mov rsi, rdi\n    xor rdx, rdx\n.l:\n    cmp byte [rsi + rdx], 0\n    je .d\n    inc rdx\n    jmp .l\n.d:\n    mov rax, 1\n    mov rdi, 1\n    syscall\n    mov rax, 1\n    mov rdi, 1\n    push 10\n    mov rsi, rsp\n    mov rdx, 1\n    syscall\n    add rsp, 8\n    leave\n    ret\n");
-            
             top_level = 1;
         } else {
-            // Blocos internos ({ ... })
             SymbolTable *old_tab = cg->tab;
             cg->tab = symtab_new(old_tab);
-            for (int i = 0; i < node->data.program.count; i++) {
-                codegen_generate(cg, node->data.program.nodes[i]);
-            }
+            for (int i = 0; i < node->data.program.count; i++) codegen_generate(cg, node->data.program.nodes[i]);
             cg->tab = old_tab;
         }
     } else if (node->type == AST_FUNC_DECL) {
-        fprintf(cg->out, "%s:\n    push rbp\n    mov rbp, rsp\n    sub rsp, 1024\n", node->data.func_decl.name);
+        int over_label = new_label();
+        fprintf(cg->out, "    jmp L%d\n", over_label);
+        if (node->data.func_decl.is_pub) fprintf(cg->out, "%s_%s:\n", cg->module_name, node->data.func_decl.name);
+        else fprintf(cg->out, "%s:\n", node->data.func_decl.name);
+        fprintf(cg->out, "    push rbp\n    mov rbp, rsp\n    sub rsp, 1024\n");
         SymbolTable *old_tab = cg->tab;
         cg->tab = symtab_new(old_tab);
         int old_stack = cg->stack_pos; cg->stack_pos = 0;
@@ -155,8 +140,10 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
             fprintf(cg->out, "    mov [rbp - %d], %s\n", cg->stack_pos, reg_params[i]);
         }
         codegen_generate(cg, node->data.func_decl.body);
-        fprintf(cg->out, "    leave\n    ret\n\n");
+        fprintf(cg->out, "    leave\n    ret\nL%d:\n", over_label);
         cg->tab = old_tab; cg->stack_pos = old_stack;
+    } else if (node->type == AST_IMPORT) {
+        // Placeholder
     } else if (node->type == AST_EXTERN_DECL) {
         fprintf(cg->out, "extern %s\n", node->data.func_decl.name);
     } else if (node->type == AST_RETURN) {
@@ -183,7 +170,7 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
     } else if (node->type == AST_DEREF_ASSIGN) {
         gen_expression(cg, node->data.deref_assign.value);
         gen_expression(cg, node->data.deref_assign.ptr);
-        fprintf(cg->out, "    pop rbx ; address\n    pop rax ; value\n    mov [rbx], rax\n");
+        fprintf(cg->out, "    pop rbx\n    pop rax\n    mov [rbx], rax\n");
     } else if (node->type == AST_PRINT) {
         gen_expression(cg, node->data.print_expr);
         fprintf(cg->out, "    pop rdi\n");

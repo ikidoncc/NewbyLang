@@ -11,8 +11,10 @@ typedef enum {
     AST_DEREF_ASSIGN,
     AST_FUNC_DECL,
     AST_EXTERN_DECL,
+    AST_IMPORT,
     AST_SYSCALL,
     AST_FUNC_CALL,
+    AST_NS_ACCESS,
     AST_RETURN,
     AST_ADDR_OF,
     AST_DEREF,
@@ -33,24 +35,26 @@ typedef enum {
 
 typedef struct ASTNode {
     ASTNodeType type;
-    Type eval_type; // Type determined after semantic analysis
+    Type eval_type;
     int line;
     int col;
     union {
-        struct { Type type; char *name; struct ASTNode *value; } var_decl;
-        struct { Type type; char *name; int size; } array_decl;
+        struct { Type type; char *name; struct ASTNode *value; int is_pub; } var_decl;
+        struct { Type type; char *name; int size; int is_pub; } array_decl;
         struct { char *name; struct ASTNode *value; } assign;
         struct { char *name; struct ASTNode *index; struct ASTNode *value; } array_assign;
         struct { struct ASTNode *ptr; struct ASTNode *value; } deref_assign;
-        struct { char *name; Type return_type; struct { Type type; char *name; } params[8]; int param_count; struct ASTNode *body; } func_decl;
+        struct { char *name; Type return_type; struct { Type type; char *name; } params[8]; int param_count; struct ASTNode *body; int is_pub; } func_decl;
         struct { char *name; struct ASTNode *args[8]; int arg_count; } func_call;
+        struct { char *module; char *name; } ns_access;
+        struct { char *module_name; } import;
         struct { struct ASTNode *args[7]; int arg_count; } syscall;
         struct { struct ASTNode *expr; } ret;
         struct { struct ASTNode *expr; } addr_of;
         struct { struct ASTNode *expr; } deref;
         struct { char *op; struct ASTNode *left; struct ASTNode *right; } bin_op;
         int number;
-        int bool_val; // 0 or 1
+        int bool_val;
         double float_val;
         char *string_val;
         char *var_name;
@@ -74,6 +78,8 @@ ASTNode *ast_new_assign(char *name, ASTNode *value);
 ASTNode *ast_new_array_assign(char *name, ASTNode *index, ASTNode *value);
 ASTNode *ast_new_func_decl(char *name, Type return_type);
 ASTNode *ast_new_extern_decl(char *name, Type return_type);
+ASTNode *ast_new_import(char *module);
+ASTNode *ast_new_ns_access(char *module, char *name);
 ASTNode *ast_new_func_call(char *name);
 ASTNode *ast_new_syscall();
 ASTNode *ast_new_return(ASTNode *expr);

@@ -1,0 +1,7 @@
+pub func triplo(int n) {
+    return n * 3;
+}
+
+func segredo() {
+    return 42;
+}
