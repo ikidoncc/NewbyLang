@@ -31,8 +31,8 @@ Este documento define as funcionalidades essenciais do **Newby** antes da estabi
 - [ ] arrays fixos e dinâmicos
 
 ## 🔥 Sistema de tipos moderno
-- [ ] enums (tagged unions) -- **ALTA PRIORIDADE**
-- [ ] pattern matching (`match`) -- **ALTA PRIORIDADE**
+- [x] enums (tagged unions)
+- [x] pattern matching (`match`)
 - [ ] generics (`fn<T>`)
 - [ ] inferência de tipos
 - [ ] traits / interfaces (polimorfismo seguro)

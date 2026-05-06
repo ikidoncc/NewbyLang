@@ -22,6 +22,7 @@ typedef enum {
     TOKEN_IMPORT,
     TOKEN_PUB,
     TOKEN_STRUCT,
+    TOKEN_ENUM,
     TOKEN_SIZEOF,
     TOKEN_SELF,
     TOKEN_RETURN,

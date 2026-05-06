@@ -14,6 +14,7 @@ typedef enum {
     AST_EXTERN_DECL,
     AST_IMPORT,
     AST_STRUCT_DEF,
+    AST_ENUM_DEF,
     AST_SYSCALL,
     AST_SIZEOF,
     AST_FUNC_CALL,
@@ -45,7 +46,7 @@ typedef struct ASTNode {
     int line;
     int col;
     union {
-        struct { Type type; char *name; struct ASTNode *value; int is_pub; char *struct_name; } var_decl;
+        struct { Type type; char *name; struct ASTNode *value; int is_pub; char *struct_name; char *enum_name; } var_decl;
         struct { Type type; char *name; int size; int is_pub; } array_decl;
         struct { char *name; struct ASTNode *value; } assign;
         struct { char *name; struct ASTNode *index; struct ASTNode *value; } array_assign;
@@ -54,6 +55,7 @@ typedef struct ASTNode {
         struct { char *name; Type return_type; struct { Type type; char *name; } params[8]; int param_count; struct ASTNode *body; int is_pub; char *parent_struct; } func_decl;
         struct { char *name; struct ASTNode *args[8]; int arg_count; struct ASTNode *obj; } func_call;
         struct { char *name; struct { Type type; char *name; } members[16]; int member_count; struct ASTNode *methods[16]; int method_count; } struct_def;
+        struct { char *name; char *variants[16]; int variant_count; } enum_def;
         struct { struct ASTNode *ptr; char *member; } member_access;
         struct { Type type; char *struct_name; } size_of;
         struct { char *module; char *name; } ns_access;
@@ -74,7 +76,7 @@ typedef struct ASTNode {
         struct { struct ASTNode *condition; struct ASTNode *then_branch; struct ASTNode *else_branch; } if_stmt;
         struct { struct ASTNode *condition; struct ASTNode *body; } while_stmt;
         struct { struct ASTNode *expr; struct ASTNode **cases; int case_count; struct ASTNode *default_case; } match;
-        struct { int val; struct ASTNode *stmt; } match_case;
+        struct { struct ASTNode *val_node; int val; struct ASTNode *stmt; } match_case;
     } data;
 } ASTNode;
 
@@ -90,6 +92,8 @@ ASTNode *ast_new_func_decl(char *name, Type return_type);
 ASTNode *ast_new_extern_decl(char *name, Type return_type);
 ASTNode *ast_new_struct_def(char *name);
 void ast_struct_add_method(ASTNode *s, ASTNode *method);
+ASTNode *ast_new_enum_def(char *name);
+void ast_enum_add_variant(ASTNode *e, char *name);
 ASTNode *ast_new_sizeof(Type type, char *struct_name);
 ASTNode *ast_new_self();
 ASTNode *ast_new_import(char *module);
@@ -112,7 +116,7 @@ void ast_func_add_param(ASTNode *func, Type type, char *name);
 void ast_call_add_arg(ASTNode *call, ASTNode *arg);
 void ast_syscall_add_arg(ASTNode *syscall, ASTNode *arg);
 void ast_struct_add_member(ASTNode *s, Type type, char *name);
-void ast_match_add_case(ASTNode *match, int val, ASTNode *stmt);
+void ast_match_add_case(ASTNode *match, ASTNode *val_node, ASTNode *stmt);
 void ast_match_set_default(ASTNode *match, ASTNode *stmt);
 void ast_program_add(ASTNode *program, ASTNode *node);
 void ast_set_loc(ASTNode *node, int line, int col);

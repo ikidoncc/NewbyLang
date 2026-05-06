@@ -120,6 +120,21 @@ ASTNode *ast_new_struct_def(char *name) {
     return node;
 }
 
+ASTNode *ast_new_enum_def(char *name) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_ENUM_DEF;
+    node->data.enum_def.name = strdup(name);
+    node->data.enum_def.variant_count = 0;
+    node->eval_type = TYPE_UNKNOWN;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+void ast_enum_add_variant(ASTNode *e, char *name) {
+    int i = e->data.enum_def.variant_count++;
+    e->data.enum_def.variants[i] = strdup(name);
+}
+
 ASTNode *ast_new_sizeof(Type type, char *struct_name) {
     ASTNode *node = malloc(sizeof(ASTNode));
     node->type = AST_SIZEOF;
@@ -261,6 +276,7 @@ ASTNode *ast_new_var_decl(Type type, char *name, ASTNode *value) {
     node->data.var_decl.value = value;
     node->data.var_decl.is_pub = 0;
     node->data.var_decl.struct_name = NULL;
+    node->data.var_decl.enum_name = NULL;
     node->eval_type = TYPE_UNKNOWN;
     ast_set_loc(node, 0, 0);
     return node;
@@ -330,12 +346,13 @@ ASTNode *ast_new_match(ASTNode *expr) {
     return node;
 }
 
-void ast_match_add_case(ASTNode *match, int val, ASTNode *stmt) {
+void ast_match_add_case(ASTNode *match, ASTNode *val_node, ASTNode *stmt) {
     match->data.match.case_count++;
     match->data.match.cases = realloc(match->data.match.cases, sizeof(ASTNode*) * match->data.match.case_count);
     ASTNode *c = malloc(sizeof(ASTNode));
     c->type = AST_CASE;
-    c->data.match_case.val = val;
+    c->data.match_case.val_node = val_node;
+    c->data.match_case.val = 0;
     c->data.match_case.stmt = stmt;
     match->data.match.cases[match->data.match.case_count - 1] = c;
 }

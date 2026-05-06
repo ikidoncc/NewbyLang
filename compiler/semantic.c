@@ -14,13 +14,30 @@ typedef struct StructDef {
     int member_count;
 } StructDef;
 
+typedef struct EnumDef {
+    char *name;
+    char *variants[16];
+    int variant_count;
+} EnumDef;
+
 static StructDef global_structs[16];
 static int global_struct_count = 0;
+
+static EnumDef global_enums[16];
+static int global_enum_count = 0;
 
 static StructDef *find_struct_def(const char *name) {
     if (!name) return NULL;
     for (int i = 0; i < global_struct_count; i++) {
         if (strcmp(global_structs[i].name, name) == 0) return &global_structs[i];
+    }
+    return NULL;
+}
+
+static EnumDef *find_enum_def(const char *name) {
+    if (!name) return NULL;
+    for (int i = 0; i < global_enum_count; i++) {
+        if (strcmp(global_enums[i].name, name) == 0) return &global_enums[i];
     }
     return NULL;
 }
@@ -56,6 +73,16 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
             break;
         }
 
+        case AST_ENUM_DEF: {
+            EnumDef *ed = &global_enums[global_enum_count++];
+            ed->name = strdup(node->data.enum_def.name);
+            ed->variant_count = node->data.enum_def.variant_count;
+            for (int i = 0; i < ed->variant_count; i++) {
+                ed->variants[i] = strdup(node->data.enum_def.variants[i]);
+            }
+            break;
+        }
+
         case AST_VAR_DECL:
             if (node->data.var_decl.value) semantic_analyze(node->data.var_decl.value, tab);
             symtab_add(tab, node->data.var_decl.name, 0, node->data.var_decl.type, 0, 0, node->data.var_decl.struct_name);
@@ -72,6 +99,21 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_MEMBER_ACCESS: {
             semantic_analyze(node->data.member_access.ptr, tab);
+            // Check if it's an enum access: Enum.Variant
+            if (node->data.member_access.ptr->type == AST_VARIABLE) {
+                EnumDef *ed = find_enum_def(node->data.member_access.ptr->data.var_name);
+                if (ed) {
+                    for (int i = 0; i < ed->variant_count; i++) {
+                        if (strcmp(ed->variants[i], node->data.member_access.member) == 0) {
+                            // Resolve to integer constant
+                            node->type = AST_NUMBER;
+                            node->data.number = i;
+                            node->eval_type = TYPE_INT;
+                            return;
+                        }
+                    }
+                }
+            }
             node->eval_type = TYPE_INT;
             break;
         }
@@ -185,7 +227,16 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
 
         case AST_MATCH:
             semantic_analyze(node->data.match.expr, tab);
-            for (int i = 0; i < node->data.match.case_count; i++) semantic_analyze(node->data.match.cases[i]->data.match_case.stmt, tab);
+            for (int i = 0; i < node->data.match.case_count; i++) {
+                ASTNode *c = node->data.match.cases[i];
+                semantic_analyze(c->data.match_case.val_node, tab);
+                // If val_node is a constant (number or enum variant resolved to number),
+                // copy its value to c->data.match_case.val
+                if (c->data.match_case.val_node->type == AST_NUMBER) {
+                    c->data.match_case.val = c->data.match_case.val_node->data.number;
+                }
+                semantic_analyze(c->data.match_case.stmt, tab);
+            }
             if (node->data.match.default_case) semantic_analyze(node->data.match.default_case, tab);
             break;
 

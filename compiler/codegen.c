@@ -169,12 +169,12 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
             fprintf(cg->out, "section .text\nglobal _start\n\n");
             for (int i = 0; i < node->data.program.count; i++) {
                 ASTNode *n = node->data.program.nodes[i];
-                if (n->type == AST_EXTERN_DECL || n->type == AST_FUNC_DECL || n->type == AST_STRUCT_DEF) codegen_generate(cg, n);
+                if (n->type == AST_EXTERN_DECL || n->type == AST_FUNC_DECL || n->type == AST_STRUCT_DEF || n->type == AST_ENUM_DEF) codegen_generate(cg, n);
             }
             if (cg->emit_entry) fprintf(cg->out, "_start:\n    push rbp\n    mov rbp, rsp\n    sub rsp, 4096\n\n");
             for (int i = 0; i < node->data.program.count; i++) {
                 ASTNode *n = node->data.program.nodes[i];
-                if (n->type != AST_EXTERN_DECL && n->type != AST_FUNC_DECL && n->type != AST_STRUCT_DEF) codegen_generate(cg, n);
+                if (n->type != AST_EXTERN_DECL && n->type != AST_FUNC_DECL && n->type != AST_STRUCT_DEF && n->type != AST_ENUM_DEF) codegen_generate(cg, n);
             }
             if (cg->emit_entry) fprintf(cg->out, "\n    mov rax, 60\n    xor rdi, rdi\n    syscall\n\n");
             fprintf(cg->out, "print_num:\n    push rbp\n    mov rbp, rsp\n    sub rsp, 32\n    mov rax, rdi\n    mov rcx, 10\n    mov rsi, rbp\n    dec rsi\n    mov byte [rsi], 10\n.loop:\n    xor rdx, rdx\n    div rcx\n    add dl, '0'\n    dec rsi\n    mov [rsi], dl\n    test rax, rax\n    jnz .loop\n    mov rax, 1\n    mov rdi, 1\n    mov rdx, rbp\n    sub rdx, rsi\n    syscall\n    leave\n    ret\n\n");
@@ -200,6 +200,8 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         }
         s->size = current_offset;
         for (int i = 0; i < node->data.struct_def.method_count; i++) codegen_generate(cg, node->data.struct_def.methods[i]);
+    } else if (node->type == AST_ENUM_DEF) {
+        // No code generation needed for enum definitions
     } else if (node->type == AST_FUNC_DECL) {
         int over_label = new_label();
         fprintf(cg->out, "    jmp L%d\n", over_label);
@@ -292,7 +294,7 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         fprintf(cg->out, "L%d:\n", l2);
     } else if (node->type == AST_WHILE) {
         int l1 = new_label(), l2 = new_label();
-        fprintf(cg->out, ".L%d:\n", l1);
+        fprintf(cg->out, "L%d:\n", l1);
         gen_expression(cg, node->data.while_stmt.condition);
         fprintf(cg->out, "    pop rax\n    test rax, rax\n    jz L%d\n", l2);
         codegen_generate(cg, node->data.while_stmt.body);
@@ -303,5 +305,20 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
     } else if (node->type == AST_SYSCALL) {
         gen_expression(cg, node);
         fprintf(cg->out, "    pop rax\n");
+    } else if (node->type == AST_MATCH) {
+        gen_expression(cg, node->data.match.expr);
+        fprintf(cg->out, "    pop rax\n");
+        int end_label = new_label();
+        for (int i = 0; i < node->data.match.case_count; i++) {
+            int next_case = new_label();
+            fprintf(cg->out, "    cmp rax, %d\n", node->data.match.cases[i]->data.match_case.val);
+            fprintf(cg->out, "    jne L%d\n", next_case);
+            codegen_generate(cg, node->data.match.cases[i]->data.match_case.stmt);
+            fprintf(cg->out, "    jmp L%d\nL%d:\n", end_label, next_case);
+        }
+        if (node->data.match.default_case) {
+            codegen_generate(cg, node->data.match.default_case);
+        }
+        fprintf(cg->out, "L%d:\n", end_label);
     }
 }
