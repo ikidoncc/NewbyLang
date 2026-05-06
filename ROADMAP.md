@@ -24,8 +24,8 @@ Evitar conflitos de nomes e permitir a reutilização de código entre arquivos.
 
 ## 4. Pipeline de Compilação Modular
 Preparar o `nbc` para trabalhar com múltiplos módulos de forma eficiente.
-- [ ] **Compilação Separada**: Gerar arquivos `.o` sem incluir o ponto de entrada `_start`.
-- [ ] **Busca Automática**: O compilador deve procurar arquivos na pasta `library/` por padrão.
+- [x] **Compilação Separada**: Gerar arquivos `.o` sem incluir o ponto de entrada `_start`.
+- [x] **Busca Automática**: O compilador deve procurar arquivos na pasta `library/` por padrão.
 
 ---
 

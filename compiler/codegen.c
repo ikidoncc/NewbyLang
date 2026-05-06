@@ -10,6 +10,7 @@ Codegen *codegen_new(FILE *out, const char *module_name) {
     cg->stack_pos = 0;
     cg->module_name = strdup(module_name);
     cg->struct_count = 0;
+    cg->emit_entry = 1;
     return cg;
 }
 
@@ -20,8 +21,6 @@ static int new_label() {
     return ++label_count;
 }
 
-static void gen_expression(Codegen *cg, ASTNode *node);
-
 static StructMeta *find_struct(Codegen *cg, const char *name) {
     if (!name) return NULL;
     for (int i = 0; i < cg->struct_count; i++) {
@@ -30,32 +29,23 @@ static StructMeta *find_struct(Codegen *cg, const char *name) {
     return NULL;
 }
 
-static int find_member_offset(StructMeta *s, const char *member) {
-    for (int i = 0; i < s->member_count; i++) {
-        if (strcmp(s->members[i].name, member) == 0) return s->members[i].offset;
-    }
-    return 0;
-}
+static void gen_expression(Codegen *cg, ASTNode *node);
 
 static void gen_lvalue(Codegen *cg, ASTNode *node) {
     if (node->type == AST_VARIABLE) {
         Symbol *s = symtab_lookup(cg->tab, node->data.var_name);
+        if (!s) { fprintf(stderr, "Undefined variable: %s\n", node->data.var_name); exit(1); }
         fprintf(cg->out, "    lea rax, [rbp - %d]\n", s->stack_offset);
         fprintf(cg->out, "    push rax\n");
     } else if (node->type == AST_DEREF) {
-        // The address of *p is the value of p
         gen_expression(cg, node->data.deref.expr);
     } else if (node->type == AST_ARRAY_ACCESS) {
         Symbol *s = symtab_lookup(cg->tab, node->data.array_access.name);
         gen_expression(cg, node->data.array_access.index);
         fprintf(cg->out, "    pop rbx\n    imul rbx, 8\n    mov rcx, rbp\n    sub rcx, %d\n    add rcx, rbx\n    push rcx\n", s->stack_offset);
     } else if (node->type == AST_MEMBER_ACCESS) {
-        // node->data.member_access.ptr is the object (not necessarily a pointer in Newby syntax)
         gen_lvalue(cg, node->data.member_access.ptr);
         fprintf(cg->out, "    pop rax\n");
-        // Simplified: assume we know the struct type. 
-        // In a real compiler we'd get this from semantic analysis.
-        // For the demo, I'll search all structs for this member (bad but works for simple case)
         int offset = 0;
         for(int i=0; i<cg->struct_count; i++) {
             for(int j=0; j<cg->structs[i].member_count; j++) {
@@ -162,12 +152,12 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
                 ASTNode *n = node->data.program.nodes[i];
                 if (n->type == AST_EXTERN_DECL || n->type == AST_FUNC_DECL || n->type == AST_STRUCT_DEF) codegen_generate(cg, n);
             }
-            fprintf(cg->out, "_start:\n    push rbp\n    mov rbp, rsp\n    sub rsp, 4096 ; More space for structs\n\n");
+            if (cg->emit_entry) fprintf(cg->out, "_start:\n    push rbp\n    mov rbp, rsp\n    sub rsp, 4096\n\n");
             for (int i = 0; i < node->data.program.count; i++) {
                 ASTNode *n = node->data.program.nodes[i];
                 if (n->type != AST_EXTERN_DECL && n->type != AST_FUNC_DECL && n->type != AST_STRUCT_DEF) codegen_generate(cg, n);
             }
-            fprintf(cg->out, "\n    mov rax, 60\n    xor rdi, rdi\n    syscall\n\n");
+            if (cg->emit_entry) fprintf(cg->out, "\n    mov rax, 60\n    xor rdi, rdi\n    syscall\n\n");
             fprintf(cg->out, "print_num:\n    push rbp\n    mov rbp, rsp\n    sub rsp, 32\n    mov rax, rdi\n    mov rcx, 10\n    mov rsi, rbp\n    dec rsi\n    mov byte [rsi], 10\n.loop:\n    xor rdx, rdx\n    div rcx\n    add dl, '0'\n    dec rsi\n    mov [rsi], dl\n    test rax, rax\n    jnz .loop\n    mov rax, 1\n    mov rdi, 1\n    mov rdx, rbp\n    sub rdx, rsi\n    syscall\n    leave\n    ret\n\n");
             fprintf(cg->out, "print_bool:\n    push rbp\n    mov rbp, rsp\n    test rdi, rdi\n    jz .f\n    mov rax, 1\n    mov rdi, 1\n    mov rsi, t_str\n    mov rdx, 5\n    syscall\n    jmp .e\n.f:\n    mov rax, 1\n    mov rdi, 1\n    mov rsi, f_str\n    mov rdx, 6\n    syscall\n.e:\n    leave\n    ret\n\n");
             fprintf(cg->out, "print_string:\n    push rbp\n    mov rbp, rsp\n    mov rsi, rdi\n    xor rdx, rdx\n.l:\n    cmp byte [rsi + rdx], 0\n    je .d\n    inc rdx\n    jmp .l\n.d:\n    mov rax, 1\n    mov rdi, 1\n    syscall\n    mov rax, 1\n    mov rdi, 1\n    push 10\n    mov rsi, rsp\n    mov rdx, 1\n    syscall\n    add rsp, 8\n    leave\n    ret\n");
@@ -237,9 +227,7 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
     } else if (node->type == AST_MEMBER_ASSIGN) {
         gen_expression(cg, node->data.member_assign.value);
         gen_lvalue(cg, node->data.member_assign.obj);
-        fprintf(cg->out, "    pop rbx ; address\n");
-        fprintf(cg->out, "    pop rax ; value\n");
-        // Simplified: search for member offset
+        fprintf(cg->out, "    pop rbx\n    pop rax\n");
         int offset = 0;
         for(int i=0; i<cg->struct_count; i++) {
             for(int j=0; j<cg->structs[i].member_count; j++) {
@@ -283,14 +271,10 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         codegen_generate(cg, node->data.while_stmt.body);
         fprintf(cg->out, "    jmp L%d\nL%d:\n", l1, l2);
     } else if (node->type == AST_FUNC_CALL) {
-        char *reg_params[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-        for (int i = 0; i < node->data.func_call.arg_count; i++) gen_expression(cg, node->data.func_call.args[i]);
-        for (int i = node->data.func_call.arg_count - 1; i >= 0; i--) fprintf(cg->out, "    pop %s\n", reg_params[i]);
-        fprintf(cg->out, "    call %s\n", node->data.func_call.name);
+        gen_expression(cg, node);
+        fprintf(cg->out, "    pop rax\n");
     } else if (node->type == AST_SYSCALL) {
-        char *reg_syscall[] = {"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"};
-        for (int i = 0; i < node->data.syscall.arg_count; i++) gen_expression(cg, node->data.syscall.args[i]);
-        for (int i = node->data.syscall.arg_count - 1; i >= 0; i--) fprintf(cg->out, "    pop %s\n", reg_syscall[i]);
-        fprintf(cg->out, "    syscall\n");
+        gen_expression(cg, node);
+        fprintf(cg->out, "    pop rax\n");
     }
 }

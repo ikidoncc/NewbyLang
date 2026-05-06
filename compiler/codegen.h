@@ -19,6 +19,7 @@ typedef struct {
     char *module_name;
     StructMeta structs[16];
     int struct_count;
+    int emit_entry;
 } Codegen;
 
 Codegen *codegen_new(FILE *out, const char *module_name);

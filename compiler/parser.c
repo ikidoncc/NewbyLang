@@ -41,7 +41,6 @@ static Type parse_type(Parser *p, char **struct_name) {
         eat(p, TOKEN_ID);
         type = TYPE_UNKNOWN;
     }
-    
     while (p->current_token.type == TOKEN_STAR) {
         eat(p, TOKEN_STAR);
         type = TYPE_PTR;
@@ -112,16 +111,25 @@ static ASTNode *parse_postfix(Parser *p) {
             eat(p, TOKEN_DOT);
             char *member = strdup(p->current_token.value);
             eat(p, TOKEN_ID);
-            n = ast_new_member_access(n, member);
+            if (p->current_token.type == TOKEN_LPAREN) {
+                eat(p, TOKEN_LPAREN);
+                char mangled[512];
+                if (n->type == AST_VARIABLE) sprintf(mangled, "%s_%s", n->data.var_name, member);
+                else sprintf(mangled, "unknown_%s", member);
+                n = ast_new_func_call(mangled);
+                while (p->current_token.type != TOKEN_RPAREN) {
+                    ast_call_add_arg(n, parse_expression(p));
+                    if (p->current_token.type == TOKEN_COMMA) eat(p, TOKEN_COMMA);
+                }
+                eat(p, TOKEN_RPAREN);
+            } else {
+                n = ast_new_member_access(n, member);
+            }
         } else if (t.type == TOKEN_LPAREN) {
             eat(p, TOKEN_LPAREN);
             if (n->type == AST_VARIABLE) {
-                char *name = n->data.var_name;
+                char *name = strdup(n->data.var_name);
                 n = ast_new_func_call(name);
-            } else if (n->type == AST_NS_ACCESS) {
-                char mangled[512];
-                sprintf(mangled, "%s_%s", n->data.ns_access.module, n->data.ns_access.name);
-                n = ast_new_func_call(mangled);
             }
             while (p->current_token.type != TOKEN_RPAREN) {
                 ast_call_add_arg(n, parse_expression(p));
@@ -197,7 +205,7 @@ static ASTNode *parse_logical(Parser *p) {
     ASTNode *left = parse_comparison(p);
     while (p->current_token.type == TOKEN_AND || p->current_token.type == TOKEN_OR) {
         Token op_t = p->current_token;
-        char *op = (op_t.type == TOKEN_AND) ? "&&" : "||";
+        char *op = (p->current_token.type == TOKEN_AND) ? "&&" : "||";
         eat(p, p->current_token.type);
         ASTNode *right = parse_comparison(p);
         left = ast_new_bin_op(op, left, right);
@@ -285,7 +293,6 @@ static ASTNode *parse_statement(Parser *p) {
             }
             eat(p, t.type);
         }
-
         if (p->current_token.type == TOKEN_STAR) {
             eat(p, TOKEN_STAR);
             type = TYPE_PTR;
@@ -436,9 +443,6 @@ static ASTNode *parse_statement(Parser *p) {
             eat(p, TOKEN_ASSIGN);
             ASTNode *val = parse_expression(p);
             eat(p, TOKEN_SEMICOLON);
-            // This is a complex assignment. I'll use AST_DEREF_ASSIGN if it's a deref
-            // or a new AST_EXPR_ASSIGN.
-            // For now, if it's a member access, handle it.
             if (expr->type == AST_MEMBER_ACCESS) {
                 ASTNode *node = malloc(sizeof(ASTNode));
                 node->type = AST_MEMBER_ASSIGN;
