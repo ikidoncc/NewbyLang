@@ -1,0 +1,31 @@
+enum Result<T, E> {
+    Ok(T),
+    Err(E)
+};
+
+func sub(int n) : Result<int, string> {
+    if (n < 0) {
+        return Result_int_string.Err("Negativo!");
+    }
+    return Result_int_string.Ok(n * 2);
+}
+
+func main_logic(int n) : Result<int, string> {
+    int val = sub(n)?;
+    print("Sucesso:");
+    print(val);
+    return Result_int_string.Ok(val);
+}
+
+Result<int, string> r1 = main_logic(10);
+Result<int, string> r2 = main_logic(-5);
+
+match (r1) {
+    case Result_int_string.Ok(v): { print("Fim Ok"); }
+    case Result_int_string.Err(e): { print(e); }
+}
+
+match (r2) {
+    case Result_int_string.Ok(v): { print("Fim Ok"); }
+    case Result_int_string.Err(e): { print(e); }
+}

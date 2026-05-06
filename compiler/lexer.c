@@ -141,6 +141,7 @@ Token lexer_next_token(Lexer *lexer) {
         case '*': return create_token(TOKEN_STAR, NULL, start_line, start_col);
         case '/': return create_token(TOKEN_SLASH, NULL, start_line, start_col);
         case '.': return create_token(TOKEN_DOT, NULL, start_line, start_col);
+        case '?': return create_token(TOKEN_QUESTION, NULL, start_line, start_col);
         case ';': return create_token(TOKEN_SEMICOLON, NULL, start_line, start_col);
         case ':': return create_token(TOKEN_COLON, NULL, start_line, start_col);
         case ',': return create_token(TOKEN_COMMA, NULL, start_line, start_col);

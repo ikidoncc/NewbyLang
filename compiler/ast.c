@@ -88,6 +88,7 @@ ASTNode *ast_new_func_decl(char *name, Type return_type) {
     node->type = AST_FUNC_DECL;
     node->data.func_decl.name = strdup(name);
     node->data.func_decl.return_type = return_type;
+    node->data.func_decl.return_struct_name = NULL;
     node->data.func_decl.param_count = 0;
     node->data.func_decl.body = NULL;
     node->data.func_decl.is_pub = 0;
@@ -102,6 +103,7 @@ ASTNode *ast_new_extern_decl(char *name, Type return_type) {
     node->type = AST_EXTERN_DECL;
     node->data.func_decl.name = strdup(name);
     node->data.func_decl.return_type = return_type;
+    node->data.func_decl.return_struct_name = NULL;
     node->data.func_decl.param_count = 0;
     node->data.func_decl.body = NULL;
     node->eval_type = TYPE_UNKNOWN;
@@ -198,6 +200,15 @@ ASTNode *ast_new_syscall() {
     node->type = AST_SYSCALL;
     node->data.syscall.arg_count = 0;
     node->eval_type = TYPE_INT;
+    ast_set_loc(node, 0, 0);
+    return node;
+}
+
+ASTNode *ast_new_try(ASTNode *expr) {
+    ASTNode *node = malloc(sizeof(ASTNode));
+    node->type = AST_TRY;
+    node->data.try.expr = expr;
+    node->eval_type = TYPE_UNKNOWN;
     ast_set_loc(node, 0, 0);
     return node;
 }

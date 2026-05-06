@@ -29,33 +29,34 @@ typedef enum {
     TOKEN_MATCH,
     TOKEN_CASE,
     TOKEN_DEFAULT,
+    TOKEN_PRINT,
     TOKEN_ID,
     TOKEN_NUMBER,
     TOKEN_FLOAT_LIT,
     TOKEN_STRING_LIT,
-    TOKEN_ASSIGN,   // =
-    TOKEN_PLUS,     // +
-    TOKEN_MINUS,    // -
-    TOKEN_STAR,     // *
-    TOKEN_SLASH,    // /
-    TOKEN_AMPERSAND, // &
-    TOKEN_DOT,      // .
-    TOKEN_EQ,       // ==
-    TOKEN_NEQ,      // !=
-    TOKEN_LT,       // <
-    TOKEN_GT,       // >
-    TOKEN_AND,      // &&
-    TOKEN_OR,       // ||
-    TOKEN_SEMICOLON, // ;
-    TOKEN_COLON,     // :
-    TOKEN_COMMA,     // ,
-    TOKEN_LPAREN,   // (
-    TOKEN_RPAREN,   // )
-    TOKEN_LBRACKET, // [
-    TOKEN_RBRACKET, // ]
-    TOKEN_LBRACE,   // {
-    TOKEN_RBRACE,   // }
-    TOKEN_PRINT,
+    TOKEN_ASSIGN,
+    TOKEN_PLUS,
+    TOKEN_MINUS,
+    TOKEN_STAR,
+    TOKEN_SLASH,
+    TOKEN_DOT,
+    TOKEN_QUESTION,
+    TOKEN_SEMICOLON,
+    TOKEN_COLON,
+    TOKEN_COMMA,
+    TOKEN_LPAREN,
+    TOKEN_RPAREN,
+    TOKEN_LBRACKET,
+    TOKEN_RBRACKET,
+    TOKEN_LBRACE,
+    TOKEN_RBRACE,
+    TOKEN_EQ,
+    TOKEN_NEQ,
+    TOKEN_LT,
+    TOKEN_GT,
+    TOKEN_AND,
+    TOKEN_OR,
+    TOKEN_AMPERSAND,
     TOKEN_EOF,
     TOKEN_UNKNOWN
 } TokenType;

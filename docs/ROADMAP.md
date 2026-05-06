@@ -79,8 +79,8 @@ Este documento define as funcionalidades essenciais do **Newby** antes da estabi
 # 6. ⚡ Sistema de Erros Moderno
 
 - [ ] `Option<T>`
-- [ ] `Result<T, E>`
-- [ ] operador `?` (propagação de erro)
+- [x] `Result<T, E>`
+- [x] operador `?` (propagação de erro)
 
 ---
 

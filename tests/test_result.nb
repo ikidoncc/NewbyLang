@@ -1,0 +1,22 @@
+enum Result<T, E> {
+    Ok(T),
+    Err(E)
+};
+
+Result<int, string> r1 = Result_int_string.Ok(42);
+Result<int, string> r2 = Result_int_string.Err("Deu erro!");
+
+func handle(Result<int, string> r) {
+    match (r) {
+        case Result_int_string.Ok(v): {
+            print(v);
+        }
+        case Result_int_string.Err(m): {
+            print(m);
+        }
+    }
+    return 0;
+}
+
+handle(r1);
+handle(r2);

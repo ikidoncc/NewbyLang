@@ -152,7 +152,7 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
                 sprintf(mangled, "%s_%s", node->data.func_decl.parent_struct, node->data.func_decl.name);
                 node->data.func_decl.name = strdup(mangled);
             }
-            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 2, 0, NULL);
+            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 2, 0, node->data.func_decl.return_struct_name);
             SymbolTable *func_tab = symtab_new(tab);
             char *old_struct = current_struct;
             if (node->data.func_decl.parent_struct) {
@@ -172,7 +172,27 @@ void semantic_analyze(ASTNode *node, SymbolTable *tab) {
         }
 
         case AST_EXTERN_DECL: {
-            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 2, 0, NULL);
+            symtab_add(tab, node->data.func_decl.name, 0, node->data.func_decl.return_type, 2, 0, node->data.func_decl.return_struct_name);
+            break;
+        }
+
+        case AST_TRY: {
+            semantic_analyze(node->data.try.expr, tab);
+            node->eval_type = TYPE_INT; // Default
+            char *enum_name = NULL;
+            if (node->data.try.expr->type == AST_FUNC_CALL) {
+                Symbol *s = symtab_lookup(tab, node->data.try.expr->data.func_call.name);
+                if (s) enum_name = s->struct_name;
+            } else if (node->data.try.expr->type == AST_VARIABLE) {
+                Symbol *s = symtab_lookup(tab, node->data.try.expr->data.var_name);
+                if (s) enum_name = s->struct_name;
+            }
+            if (enum_name) {
+                EnumDef *ed = find_enum_def(enum_name);
+                if (ed && ed->variant_count > 0) {
+                    node->eval_type = ed->variants[0].type;
+                }
+            }
             break;
         }
 

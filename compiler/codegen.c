@@ -134,17 +134,34 @@ static void gen_expression(Codegen *cg, ASTNode *node) {
             else total_words += 1;
         }
 
-        // Pop in increasing order: reg[0] gets top, reg[1] gets next...
         for (int i = 0; i < total_words; i++) {
             fprintf(cg->out, "    pop %s\n", reg_params[i]);
         }
 
-        fprintf(cg->out, "    call %s\n    push rax\n", node->data.func_call.name);
+        fprintf(cg->out, "    call %s\n", node->data.func_call.name);
+        // Handle 16-byte return if applicable. 
+        // Simplified: push rax and possibly rdx.
+        // Assume monomorphized enums return 16 bytes.
+        if (node->eval_type == TYPE_UNKNOWN) { // Hack: check for monomorphized
+             fprintf(cg->out, "    push rdx\n    push rax\n");
+        } else {
+             fprintf(cg->out, "    push rax\n");
+        }
     } else if (node->type == AST_METHOD_CALL) {
         if (node->data.func_call.arg_count > 0) gen_expression(cg, node->data.func_call.args[0]);
         else fprintf(cg->out, "    push 0\n");
         fprintf(cg->out, "    mov rax, %d\n", node->data.number);
         fprintf(cg->out, "    push rax\n");
+    } else if (node->type == AST_TRY) {
+        gen_expression(cg, node->data.try.expr);
+        fprintf(cg->out, "    pop rax ; tag\n");
+        fprintf(cg->out, "    pop rbx ; data\n");
+        int ok_label = new_label();
+        fprintf(cg->out, "    cmp rax, 0\n");
+        fprintf(cg->out, "    je L%d\n", ok_label);
+        fprintf(cg->out, "    mov rdx, rbx\n    leave\n    ret\n");
+        fprintf(cg->out, "L%d:\n", ok_label);
+        fprintf(cg->out, "    push rbx\n");
     } else if (node->type == AST_SYSCALL) {
         char *reg_syscall[] = {"rax", "rdi", "rsi", "rdx", "r10", "r8", "r9"};
         for (int i = 0; i < node->data.syscall.arg_count; i++) gen_expression(cg, node->data.syscall.args[i]);
@@ -269,7 +286,16 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         fprintf(cg->out, "extern %s\n", node->data.func_decl.name);
     } else if (node->type == AST_RETURN) {
         gen_expression(cg, node->data.ret.expr);
-        fprintf(cg->out, "    pop rax\n    leave\n    ret\n");
+        // If it's a 16-byte return from gen_expression (e.g. enum variable or constructor)
+        // it pushed 16 bytes. 
+        // simplified: pop 2 regs if it's an enum or func call returning enum.
+        if (node->data.ret.expr->type == AST_METHOD_CALL || node->data.ret.expr->type == AST_FUNC_CALL || (node->data.ret.expr->type == AST_VARIABLE && symtab_lookup(cg->tab, node->data.ret.expr->data.var_name)->is_array == 4)) {
+            fprintf(cg->out, "    pop rax ; tag\n");
+            fprintf(cg->out, "    pop rdx ; data\n");
+        } else {
+            fprintf(cg->out, "    pop rax\n");
+        }
+        fprintf(cg->out, "    leave\n    ret\n");
     } else if (node->type == AST_VAR_DECL) {
         int size = 8;
         if (node->data.var_decl.struct_name) {
@@ -279,7 +305,7 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         }
         if (node->data.var_decl.value) {
             gen_expression(cg, node->data.var_decl.value);
-            if (node->data.var_decl.value->type == AST_METHOD_CALL) size = 16;
+            if (node->data.var_decl.value->type == AST_METHOD_CALL || node->data.var_decl.value->type == AST_FUNC_CALL) size = 16;
             
             if (size == 8) {
                 fprintf(cg->out, "    pop rax\n");
@@ -363,7 +389,9 @@ void codegen_generate(Codegen *cg, ASTNode *node) {
         fprintf(cg->out, "    jmp L%d\nL%d:\n", l1, l2);
     } else if (node->type == AST_FUNC_CALL) {
         gen_expression(cg, node);
-        fprintf(cg->out, "    pop rax\n");
+        // Clean up stack
+        if (node->eval_type == TYPE_UNKNOWN) fprintf(cg->out, "    add rsp, 16\n");
+        else fprintf(cg->out, "    add rsp, 8\n");
     } else if (node->type == AST_SYSCALL) {
         gen_expression(cg, node);
         fprintf(cg->out, "    pop rax\n");

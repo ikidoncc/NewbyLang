@@ -178,7 +178,8 @@ static int in_match_case = 0;
 
 static ASTNode *parse_postfix(Parser *p) {
     ASTNode *n = parse_atom(p);
-    while (p->current_token.type == TOKEN_LBRACKET || p->current_token.type == TOKEN_DOT || p->current_token.type == TOKEN_LPAREN) {
+    while (p->current_token.type == TOKEN_LBRACKET || p->current_token.type == TOKEN_DOT || 
+           p->current_token.type == TOKEN_LPAREN || p->current_token.type == TOKEN_QUESTION) {
         Token t = p->current_token;
         if (t.type == TOKEN_LBRACKET) {
             eat(p, TOKEN_LBRACKET);
@@ -205,6 +206,9 @@ static ASTNode *parse_postfix(Parser *p) {
             } else {
                 n = ast_new_member_access(n, member);
             }
+        } else if (t.type == TOKEN_QUESTION) {
+            eat(p, TOKEN_QUESTION);
+            n = ast_new_try(n);
         } else if (t.type == TOKEN_LPAREN) {
             if (in_match_case) break;
             eat(p, TOKEN_LPAREN);
@@ -234,6 +238,14 @@ static ASTNode *parse_unary(Parser *p) {
         Token t = p->current_token;
         eat(p, TOKEN_AMPERSAND);
         ASTNode *node = ast_new_addr_of(parse_unary(p));
+        ast_set_loc(node, t.line, t.col);
+        return node;
+    } else if (p->current_token.type == TOKEN_MINUS) {
+        Token t = p->current_token;
+        eat(p, TOKEN_MINUS);
+        ASTNode *zero = ast_new_number(0);
+        ASTNode *expr = parse_unary(p);
+        ASTNode *node = ast_new_bin_op("-", zero, expr);
         ast_set_loc(node, t.line, t.col);
         return node;
     }
@@ -487,6 +499,7 @@ static ASTNode *parse_statement(Parser *p) {
             eat(p, TOKEN_COLON);
             char *s_name = NULL;
             node->data.func_decl.return_type = parse_type(p, &s_name);
+            node->data.func_decl.return_struct_name = s_name;
         }
         node->data.func_decl.body = parse_statement(p);
         ast_set_loc(node, t.line, t.col);
@@ -511,6 +524,7 @@ static ASTNode *parse_statement(Parser *p) {
             eat(p, TOKEN_COLON);
             char *s_name = NULL;
             node->data.func_decl.return_type = parse_type(p, &s_name);
+            node->data.func_decl.return_struct_name = s_name;
         }
         eat(p, TOKEN_SEMICOLON);
         ast_set_loc(node, t.line, t.col);

@@ -145,6 +145,7 @@ int main(int argc, char **argv) {
     char cmd[2048];
     sprintf(cmd, "nasm -f elf64 %s -o %s", asm_filename, obj_filename);
     if (system(cmd) != 0) return 1;
+    remove(asm_filename);
 
     if (!compile_only) {
         char link_cmd[4096];

@@ -21,6 +21,7 @@ typedef enum {
     AST_NS_ACCESS,
     AST_MEMBER_ACCESS,
     AST_METHOD_CALL,
+    AST_TRY,
     AST_SELF,
     AST_RETURN,
     AST_ADDR_OF,
@@ -52,7 +53,7 @@ typedef struct ASTNode {
         struct { char *name; struct ASTNode *index; struct ASTNode *value; } array_assign;
         struct { struct ASTNode *ptr; struct ASTNode *value; } deref_assign;
         struct { struct ASTNode *obj; char *member; struct ASTNode *value; } member_assign;
-        struct { char *name; Type return_type; struct { Type type; char *name; char *struct_name; } params[8]; int param_count; struct ASTNode *body; int is_pub; char *parent_struct; } func_decl;
+        struct { char *name; Type return_type; char *return_struct_name; struct { Type type; char *name; char *struct_name; } params[8]; int param_count; struct ASTNode *body; int is_pub; char *parent_struct; } func_decl;
         struct { char *name; struct ASTNode *args[8]; int arg_count; struct ASTNode *obj; } func_call;
         struct { char *name; struct { Type type; char *name; } members[16]; int member_count; struct ASTNode *methods[16]; int method_count; } struct_def;
         struct { char *name; struct { char *name; Type type; char *struct_name; } variants[16]; int variant_count; char *generic_params[4]; int generic_count; } enum_def;
@@ -61,6 +62,7 @@ typedef struct ASTNode {
         struct { char *module; char *name; } ns_access;
         struct { char *module_name; } import;
         struct { struct ASTNode *args[7]; int arg_count; } syscall;
+        struct { struct ASTNode *expr; } try;
         struct { struct ASTNode *expr; } ret;
         struct { struct ASTNode *expr; } addr_of;
         struct { struct ASTNode *expr; } deref;
@@ -102,6 +104,7 @@ ASTNode *ast_new_ns_access(char *module, char *name);
 ASTNode *ast_new_member_access(ASTNode *ptr, char *member);
 ASTNode *ast_new_func_call(char *name);
 ASTNode *ast_new_syscall();
+ASTNode *ast_new_try(ASTNode *expr);
 ASTNode *ast_new_return(ASTNode *expr);
 ASTNode *ast_new_addr_of(ASTNode *expr);
 ASTNode *ast_new_deref(ASTNode *expr);
